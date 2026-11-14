@@ -2,11 +2,41 @@
 
 A small AMOLED screen you wear as a hair clip, and the iPhone app that feeds it.
 
-PixelClip is firmware for an off-the-shelf ESP32-S3 display board plus a SwiftUI companion app. The phone does the
-heavy work (cropping, dithering, text rendering, encoding); the clip decompresses and shows what it is sent, runs for
-hours on a small LiPo cell, and needs no internet.
+<p align="center">
+  <img src="case/renders/pixelclip-case-three-quarter.png" alt="The PixelClip case: a rounded tray and lid with an oval window over the screen" width="560">
+  <img src="case/renders/pixelclip-case-exploded.png" alt="Exploded view: the lid lifted off the tray, one key out on each side" width="300">
+</p>
 
-What the clip can show:
+PixelClip is everything you need to build one: firmware for an off-the-shelf ESP32-S3 display board, a SwiftUI
+companion app, a 3-D printable case, a parts list and a build guide. The phone does the heavy work (cropping,
+dithering, text rendering, encoding); the clip decompresses and shows what it is sent, runs for hours on a small
+LiPo cell, and needs no internet.
+
+<p align="center">
+  <img src="docs/images/app-home.png" alt="The app's home screen" width="230">
+  <img src="docs/images/app-scenes.png" alt="Choosing a live scene" width="230">
+  <img src="docs/images/app-tarot.png" alt="The Tarot oracle" width="230">
+</p>
+
+## Build one
+
+| Step | What you do | Where to look |
+|---|---|---|
+| 1 | **Get the parts**: one display board, one small LiPo cell, one resistor, a hair clip | [`docs/PARTS.md`](docs/PARTS.md) |
+| 2 | **Print the case**: tray, lid and two side keys in PETG, no supports | [`case/README.md`](case/README.md) |
+| 3 | **Flash the firmware** over USB-C | [Build the firmware](#build-the-firmware) |
+| 4 | **Prepare the board and assemble**: make room for the cell, check the battery polarity, close the case | [`docs/BUILD.md`](docs/BUILD.md) |
+| 5 | **Install the app** on your iPhone and send a first picture | [Build the app](#build-the-app) |
+
+[`docs/BUILD.md`](docs/BUILD.md) walks through all of it in order, 21 short steps from an empty bench to a clip in
+your hair. No hardware yet? The app runs in the iOS simulator against a built-in virtual clip, so you can try
+everything first.
+
+**Before you start**, read [what has and has not been tested](docs/BUILD.md#what-has-and-has-not-been-tested).
+This is a hobby project documented from one working clip. In particular, the board's charger must be slowed down
+with a resistor change before it charges a cell this small, and that change is computed, not measured.
+
+## What the clip can show
 
 - **Pictures and animations** in a playlist, with cuts or fades (`.hca`, a simple RLE format for RGB565 frames).
 - **Scrolling strips**: wide images that move across the screen as a marquee.
@@ -25,13 +55,18 @@ uploads. The wire contract is [`docs/PROTOCOL.md`](docs/PROTOCOL.md).
 
 - **Board**: Waveshare ESP32-S3-AMOLED-1.91, the non-touch version. ESP32-S3R8 (8 MB PSRAM), 16 MB flash, a
   1.91-inch 536 × 240 AMOLED (RM67162 over QSPI), a QMI8658C IMU, a BOOT button, USB-C, and a LiPo charger.
-- **Battery**: a single-cell LiPo on the board's battery connector. Development used a 500 mAh cell rated for 0.5 A.
-  Read the battery and charge-current notes in [`docs/HARDWARE.md`](docs/HARDWARE.md) before choosing a cell: the
-  board's charger is set for a high charge current.
-- **Mounting**: the software assumes a plain rectangular screen with nothing covering it. No case design is
-  included; [`docs/MECHANICAL.md`](docs/MECHANICAL.md) has the board's measurements.
+- **Battery**: a single-cell LiPo on the board's battery connector. Development used a protected 500 mAh cell
+  (size 602040) rated for 0.5 A. Read the charge-current notes in [`docs/PARTS.md`](docs/PARTS.md) before choosing
+  a cell: as shipped, the board's charger is set for about 1 A.
+- **Case**: a snap-together tray and lid, about 80 × 33 × 15 mm, with two captive side keys over the board's
+  buttons. No screws, no supports. STL files for printing, STEP files and the parametric Fusion script for
+  editing, renders and print settings are in [`case/`](case/README.md).
+- **One mismatch to know about**: the lid's window is an oval, which hides about 6 % of the picture at the four
+  corners, while the firmware and app draw to the full rectangular screen. Keep important detail out of the
+  extreme corners, or remix the lid with a rectangular window.
 
-Pin map, power path and panel details: [`docs/HARDWARE.md`](docs/HARDWARE.md).
+The full list with specifications is [`docs/PARTS.md`](docs/PARTS.md). Pin map, power path and panel details:
+[`docs/HARDWARE.md`](docs/HARDWARE.md); board measurements: [`docs/MECHANICAL.md`](docs/MECHANICAL.md).
 
 ## Repository layout
 
@@ -41,7 +76,8 @@ Pin map, power path and panel details: [`docs/HARDWARE.md`](docs/HARDWARE.md).
 | `core/` | Portable C11 library shared by the firmware and the host tools (decoder, scenes, reader, oracle, board). Details: [`core/README.md`](core/README.md) |
 | `tools/` | Host command-line tools (`hcaenc`, `hcadec`, `hcainfo`, previews) and test fixtures |
 | `ios/` | The iPhone app (XcodeGen, Swift 6, iOS 26) and its engine package `PixelClipKit`. Details: [`ios/README.md`](ios/README.md) |
-| `docs/` | Protocol, hardware and mechanical notes |
+| `case/` | The 3-D printable case: STEP and STL files, renders, print settings. Details: [`case/README.md`](case/README.md) |
+| `docs/` | Parts list ([`PARTS.md`](docs/PARTS.md)), build guide ([`BUILD.md`](docs/BUILD.md)), protocol, hardware and mechanical notes |
 
 ## Build the firmware
 
@@ -122,7 +158,7 @@ Developer membership. More detail: "Bundle id and signing" in [`ios/README.md`](
 
 ## Licence and credits
 
-PixelClip's own code and content are released under the [MIT licence](LICENSE).
+PixelClip's own code, content and case design files are released under the [MIT licence](LICENSE).
 
 Bundled third-party material keeps its own terms:
 

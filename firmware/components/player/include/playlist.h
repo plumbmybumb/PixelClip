@@ -169,6 +169,11 @@ esp_err_t playlist_store(const char *json, size_t len);
 /* Load the stored playlist into `out` (empty playlist if missing or now invalid). */
 void playlist_load(playlist_t *out);
 
+/* Safe start (health.h, called by app_main before player_init): move the stored playlist out of the way, so
+ * this boot and every later reload see an empty one until a new playlist is stored. The old document is kept
+ * as playlist.bad.json (replacing an earlier one) for a post-mortem over USB. True when there was one. */
+bool playlist_set_aside(void);
+
 /* Stored JSON (malloc'd, caller frees); `{"version":1,"items":[]}` if none. */
 char *playlist_read_json(void);
 

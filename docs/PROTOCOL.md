@@ -54,10 +54,10 @@ Encoder guidance (phone side): emit a repeat run for ≥ 3 identical pixels, lit
 ## 3. WiFi session
 
 - Long-press BOOT (≥ 1.5 s) toggles **upload mode**. On entry the clip shows a splash "WiFi: `<ssid>`" for 3 s, then blanks the display and starts a SoftAP.
-- SSID `PixelClip-XXXX` (ASCII, no accent, so hotspot joining is reliable; XXXX = last 2 MAC bytes, hex upper). WPA2-PSK, default passphrase `pixelclip-2026` (changeable via `/config`). Channel 6, max 1 station, TX power capped (≈ 8–11 dBm) to protect the battery.
+- SSID `PixelClip-XXXX` (ASCII, no accent, so hotspot joining is reliable; XXXX = last 2 MAC bytes, hex upper). WPA2-PSK, default passphrase `pixelclip-2026` (changeable with the `ap_password` config key: write-only, and only over WiFi, see §4 "Config JSON"). Channel 6, max 1 station, TX power capped (≈ 8–11 dBm) to protect the battery.
 - IP `192.168.4.1`, DHCP for the phone, mDNS `pixelclip.local`.
 - The AP shuts down and the display returns after `upload_timeout_s` (default 120) with no HTTP request, or immediately on `POST /session/end`, or on another long-press.
-- The phone joins via `NEHotspotConfiguration` (join-once) and talks plain HTTP. No TLS, no auth beyond WPA2.
+- The phone joins via `NEHotspotConfiguration` (the configuration is remembered, not join-once) and talks plain HTTP. No TLS, no auth beyond WPA2.
 - **Display during a session**: by default the screen stays on and keeps playing, with a small accent-coloured connection mark top-right; `/show`, `/next`, `/brightness` and `/screenshot` are live. Config `display_during_upload:false` turns the panel off for the session instead (needed for cells rated ≤ 0.2 A).
 - **Findable while linked**: the clip keeps advertising while a central is connected (two links allowed; a
   second central becomes the current one and the previous link is dropped), and a central that sends nothing for
@@ -78,7 +78,11 @@ existing BLE link instead of raising the hotspot. The GATT service has two chara
 - `rsp` (notify, chunked the same way): `STATUS SP LF [body]`, e.g. `200 \n{"ok":true,...}`.
 The device routes the payload through the **same handlers as HTTP** (identical status codes and JSON). Endpoints allowed on the
 fast lane: everything except `PUT /assets/{id}`, `PUT /texts/{id}`, `POST /ota`, `GET /screenshot`, `GET /assets/{id}` and
-`GET /batlog` (bulk transfers stay on WiFi; the device answers `413` for them over BLE). A fast-lane request does not start a
+`GET /batlog` (bulk transfers stay on WiFi; the device answers `413` for them over BLE). Also WiFi only, because the
+BLE link has no pairing and anyone in range can use it: `GET /coredump`, the development routes `GET /imu`,
+`POST /imu/calibrate` and `POST /queue/test`, and a `PUT /config` that carries `ap_password` (the whole request is
+refused, nothing of it is applied). All of these answer `413 {"ok":false,"error":"use_wifi"}` over BLE, which a client
+treats as "send this one over the hotspot". A fast-lane request does not start a
 WiFi session and does not touch the session idle timer. The app uses the fast lane whenever no WiFi session is open and the
 request is allowed; it falls back to the doorbell + hotspot path otherwise. Throughput target: a 2 KB playlist document in < 1 s
 at a 185-byte MTU (iOS negotiates up to 512).
@@ -97,8 +101,8 @@ Base `http://192.168.4.1`. JSON bodies are UTF-8. Every JSON response is an obje
 | GET | `/assets/{id}` | – | raw `.hca` (for debugging / app re-download) |
 | GET | `/playlist` | – | playlist JSON |
 | PUT | `/playlist` | playlist JSON | `{"ok":true}`; unknown asset ids → `422` |
-| GET | `/config` | – | config JSON |
-| PUT | `/config` | partial config JSON (merge) | full config JSON |
+| GET | `/config` | – | config JSON (never contains `ap_password`) |
+| PUT | `/config` | partial config JSON (merge) | config JSON (never contains `ap_password`); invalid value → `422 invalid_config` |
 | POST | `/time` | `{"epoch":<unix s>,"tz_offset_s":<int>}` | `{"ok":true}` |
 | POST | `/show/{id}` | `{"duration_ms":<optional>}` | `{"ok":true}` — plays `id` now, then resumes playlist |
 | POST | `/next` · `/prev` | – | `{"ok":true}` |
@@ -111,6 +115,24 @@ Base `http://192.168.4.1`. JSON bodies are UTF-8. Every JSON response is an obje
 | GET | `/scenes` | – | supported live scenes and their parameter ranges (see the `scene` item below) |
 | GET | `/batlog` | – | `text/csv` battery log: `epoch,uptime_s,mv,pct,usb,mode,display,brightness` one row per minute, ring-buffered (~64 KB). Optional endpoint; `404` if the firmware lacks it |
 | DELETE | `/batlog` | – | `{"ok":true}` clears the log |
+
+**Request checks** (HTTP only; the BLE fast lane has no headers). The clip serves no web pages, so a request made by
+a page in a browser is never one of its own clients, and it must not be possible for such a page to drive the clip
+while the phone is on the hotspot:
+
+- A request that carries an `Origin` header, or a `Sec-Fetch-Site` header other than `none` / `same-origin`, is
+  refused with `403 {"ok":false,"error":"cross_origin"}`. No response carries CORS headers.
+- `Host` must be the clip's address (`192.168.4.1`) or `pixelclip.local`, in any case, with or without `:80`;
+  anything else is `403 bad_host` (a page that points its own host name at the clip would otherwise be same-origin
+  with the API). A request without a `Host` header is served: only HTTP/1.0 tools send none.
+- A JSON body must be sent with `Content-Type: application/json` (parameters such as `; charset=utf-8` are fine),
+  else `415 {"ok":false,"error":"unsupported_media_type"}`. This covers every route whose body is JSON, including
+  `PUT /playlist` and `PUT /fonts/{id}`; requests without a body need no `Content-Type`.
+- JSON nested deeper than 16 levels is not JSON (`400 bad_json`; `PUT /fonts/{id}`: `422 malformed`), on both
+  transports. The documents of this protocol nest at most 5 levels.
+- Slow clients: the request line and headers must arrive within 10 s, with no pause of 5 s; a request body or a response that stops
+  moving for 30 s (body) / 10 s (response), or moves less than 4 KB per 30 s of waiting, is dropped and the
+  connection closed. An upload that is cut this way, or by the end of the session, leaves nothing behind.
 
 Memory errors: any endpoint may answer `503 {"ok":false,"error":"no_memory"}` when internal RAM is exhausted,
 and bulk uploads `503 low_memory` when fewer than 12 KB are free. Both are **retryable**: the app waits 2 s and retries up to 3 times.
@@ -180,9 +202,18 @@ Rules: `duration_ms > 0` wins. If `0`, play `loops` complete loops (min 1) for a
 
 Config JSON (all keys optional on PUT):
 ```json
-{"name":"PixelClip","brightness":160,"upload_timeout_s":120,"ap_password":"pixelclip-2026",
- "low_battery_pct":8,"default_transition":"fade","tz_offset_s":7200,"orientation":"auto"}
+{"name":"PixelClip","brightness":160,"upload_timeout_s":120,
+ "low_battery_pct":8,"default_transition":"fade","tz_offset_s":7200,"orientation":"auto",
+ "display_during_upload":true,"wifi_always_on":false,"ble_wake":true}
 ```
+- `ap_password` (8–63 printable ASCII characters, takes effect at the next session) is **write-only**: it can be set
+  with `PUT /config`, and no response of `GET /config` or `PUT /config` ever contains it, on either transport. It can
+  only be set over WiFi; over the BLE fast lane a `PUT /config` that carries the key answers `413 use_wifi` (§3b).
+  A client keeps its own copy of the passphrase it set.
+- `low_battery_pct` is `0`–`20` (the clip switches itself off at that charge; `0` leaves only the fixed 3.40 V floor).
+  A larger value is `422 invalid_config`.
+- Ranges of the other keys: `name` 1–64 bytes, `brightness` 0–255, `upload_timeout_s` 30–1800,
+  `default_transition` `cut | fade`, `tz_offset_s` ±50400.
 
 ### Orientation
 

@@ -440,7 +440,14 @@ public actor VirtualClipClient: ClipClient {
 
     public func config() async throws -> ClipConfig {
         try await enter("GET /config")
-        return cfg
+        return answered(cfg)
+    }
+
+    /// As the firmware: the hotspot passphrase is write-only, no answer carries it (PROTOCOL §4).
+    private func answered(_ c: ClipConfig) -> ClipConfig {
+        var out = c
+        out.apPassword = nil
+        return out
     }
 
     public func putConfig(_ patch: ClipConfig) async throws -> ClipConfig {
@@ -454,7 +461,7 @@ public actor VirtualClipClient: ClipClient {
         if patch.displayDuringUpload != nil, inSession { engine.setOutput(cfg.screenStaysOn, now: deviceNow) }
         if patch.brightness != nil { liveBrightness = nil }
         if nameChanged { idleFrame = nil }
-        return cfg
+        return answered(cfg)
     }
 
     public func setTime(_ time: TimeSync) async throws {

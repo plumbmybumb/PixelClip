@@ -41,7 +41,7 @@ esp_err_t display_flush_full(void);
 esp_err_t display_flush_rect(int x, int y, int w, int h);
 
 /* Band rendering: draw full-width rows [y, y + h) (widened to even rows, clipped) straight into the internal DMA
- * bounce buffers, CONFIG_HAIRCLIP_LCD_BOUNCE_ROWS rows at a time: fn(px, band_y, rows, arg) must write every pixel of
+ * bounce buffers, CONFIG_PIXELCLIP_LCD_BOUNCE_ROWS rows at a time: fn(px, band_y, rows, arg) must write every pixel of
  * px (RGB565BE, DISPLAY_W per row, row 0 = panel row band_y). Band n + 1 is drawn while band n is on the wire, so a
  * frame costs about max(draw, transfer) instead of draw + copy + transfer. keep_fb also copies each band into the
  * framebuffer (screenshots, later display_flush_rect calls). Overlays are patched in as by the flushes. Blocks until

@@ -8,3 +8,41 @@ sdkconfig.old
 managed_components/
 firmware/test_host/build/
 tools/previews-scenes/out/
+
+# --- Release hygiene (security audit REL-14) -------------------------------------------------------
+# Crash dumps: a core dump is an image of the clip's RAM and can hold the hotspot password and any text
+# on the clip. firmware/README.md tells you to save one as core.bin.
+core.bin
+# Screenshot outputs named in firmware/README.md (scripts/screenshot.sh and the curl one-liner).
+shot.png
+shot.raw
+out.png
+# The optional boot splash (firmware/README.md, "Boot splash") is the builder's own picture; nothing in
+# this folder is meant to be committed.
+firmware/main/assets/
+# Swift encoder test output (ios/README.md); the one file already tracked there stays tracked until removed.
+ios/fixtures-out/
+# Apple signing material and secrets.
+*.p12
+*.p8
+*.cer
+*.mobileprovision
+.env
+.env.*
+# Xcode per-user state (the *.xcuserdata/ pattern above does not match Xcode's xcuserdata/ folders).
+xcuserdata/
+# Editors, Python environments, OS clutter.
+.vscode/
+.idea/
+*.swp
+*~
+.venv/
+venv/
+Thumbs.db
+# --- end release hygiene ----------------------------------------------------------------------------
+
+# --- iOS: the builder's own signing identifiers (ios/README.md, "Bundle id and signing") ----------
+# Apple team id, bundle id prefix and App Group for a device build. ios/Config.xcconfig (committed, with
+# com.example placeholders) includes this file when it exists; ios/Local.xcconfig.example is the template.
+ios/Local.xcconfig
+# --- end iOS ------------------------------------------------------------------------------------------

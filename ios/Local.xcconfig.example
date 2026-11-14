@@ -1,0 +1,14 @@
+// Copy this file to Local.xcconfig (same folder) and fill it in to build PixelClip for an iPhone.
+// Local.xcconfig is git-ignored: your team id and bundle ids stay on your Mac.
+//
+// Then: DEVICE_ID=<udid> ./build.sh device          (or device-release)
+
+// Your Apple team id: ten characters, from Xcode ▸ Settings ▸ Accounts, or developer.apple.com ▸ Membership.
+// It must be a paid Apple Developer Program team (the Hotspot Configuration entitlement needs one).
+DEVELOPMENT_TEAM = ABCDE12345
+
+// A reverse-DNS prefix you own. The app becomes <prefix>.pixelclip (with .share and .uitests beside it).
+BUNDLE_ID_PREFIX = com.yourname
+
+// Optional: the App Group, if you want another name than group.<prefix>.pixelclip.
+// APP_GROUP_ID = group.com.yourname.pixelclip

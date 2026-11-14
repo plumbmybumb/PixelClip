@@ -3,6 +3,12 @@
 GET /ble), only for testing the scripts
 without hardware:  python3 scripts/mock_clip.py 18080 &  SKIP_WIFI=1 CLIP=http://127.0.0.1:18080 scripts/e2e.sh
 Not a reference implementation: the firmware is the source of truth.
+Request checks (PROTOCOL 4 "Request checks"), like the firmware's HTTP adapter: a request with an Origin header (or a
+Sec-Fetch-Site other than none / same-origin) is 403 cross_origin; a Host that is neither the clip's (192.168.4.1,
+pixelclip.local) nor this mock's own address is 403 bad_host (no Host at all is served); a JSON body that is not sent
+as application/json is 415 unsupported_media_type; JSON nested deeper than 16 levels is not JSON (400 bad_json).
+Config: GET /config and the PUT /config answer never contain ap_password (it stays settable here, the mock being the
+WiFi side); low_battery_pct is 0-20.
 Core dump: GET/DELETE /coredump answer 404 no_coredump by default; MOCK_COREDUMP=1 starts with a fake 4 KB image
 (/status.resets.coredump true until DELETE /coredump).
 Oracle (PROTOCOL 5f, 5f.2, 5f.6, 5f.7): items are validated like the firmware (id = the reader bundle under /texts with
@@ -26,6 +32,29 @@ assets = {}; playlist = '{"version":1,"items":[]}'
 texts = {}; fonts = {}; progress = {}; reader = {"paused": False}   # Reader mode (PROTOCOL 5c)
 cfg = {"name":"PixelClip","brightness":160,"upload_timeout_s":120,"ap_password":"pixelclip-2026","low_battery_pct":8,"default_transition":"fade","tz_offset_s":0,
        "display_during_upload":True,"wifi_always_on":False,"ble_wake":True,"orientation":"auto"}
+# What the API shows of the config: everything but the hotspot passphrase, which is write-only (PROTOCOL 4).
+def cfg_view(): return dict({k: v for k, v in cfg.items() if k != "ap_password"}, ok=True)
+# JSON as the firmware parses it: cJSON built with CJSON_NESTING_LIMIT 16 (firmware/json_limit.cmake). Deeper
+# documents are "not JSON". The depth is counted before parsing (Python's own parser would recurse).
+JSON_NESTING_LIMIT = 16
+def jloads(b):
+    if isinstance(b, bytes): b = b.decode("utf-8")
+    depth = 0; in_str = esc = False
+    for ch in b:
+        if in_str:
+            if esc: esc = False
+            elif ch == "\\": esc = True
+            elif ch == '"': in_str = False
+        elif ch == '"': in_str = True
+        elif ch in "[{":
+            depth += 1
+            if depth > JSON_NESTING_LIMIT: raise ValueError("nested deeper than %d" % JSON_NESTING_LIMIT)
+        elif ch in "]}": depth -= 1
+    return json.loads(b)
+# Routes whose body is JSON (the firmware's read_json / PUT /playlist / PUT /fonts): Content-Type must say so.
+def json_route(method, p):
+    if method == "PUT": return p in ("/playlist", "/config") or p.startswith("/fonts/")
+    return method == "POST" and p not in ("/ota", "/next", "/prev", "/session/end")
 CFG_BOOLS = ("display_during_upload", "wifi_always_on", "ble_wake")
 ORIENTATIONS = ("auto", "normal", "flipped")   # PROTOCOL 4 "Orientation"
 # Mock gravity is fixed (IMU_RAW["rest"], gy ~ 0): auto never flips, so flipped == (mode == "flipped").
@@ -510,10 +539,32 @@ class H(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0); return self.rfile.read(n) if n else b""
     def jbody(self):
         b = self.body()
-        try: j = json.loads(b) if b else {}
+        try: j = jloads(b) if b else {}
         except Exception: return None
         return j if isinstance(j, dict) else None
+    # PROTOCOL 4 "Request checks" (the firmware's http_request_allowed / json_type_ok). True = go on.
+    def gate(self, method):
+        h = self.headers; p = self.path.split("?")[0]
+        host = (h.get("Host") or "").lower()
+        if host.endswith(":80"): host = host[:-3]
+        own = "%s:%d" % self.server.server_address
+        if h.get("Origin") or (h.get("Sec-Fetch-Site") or "none").lower() not in ("none", "same-origin"):
+            self.body(); self.err(403, "cross_origin"); return False
+        if host and host not in ("192.168.4.1", "pixelclip.local", own, "localhost:%d" % self.server.server_address[1]):
+            self.body(); self.err(403, "bad_host"); return False
+        n = int(h.get("Content-Length") or 0)
+        if n and json_route(method, p) and (h.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json":
+            self.body(); self.err(415, "unsupported_media_type"); return False
+        return True
     def do_GET(self):
+        if self.gate("GET"): self.get()
+    def do_PUT(self):
+        if self.gate("PUT"): self.put()
+    def do_POST(self):
+        if self.gate("POST"): self.post()
+    def do_DELETE(self):
+        if self.gate("DELETE"): self.delete()
+    def get(self):
         p = self.path.split("?")[0]
         if p == "/status":
             doc = json.loads(playlist); items = doc["items"]; q = sorted(doc.get("queue", []), key=lambda e: e["at"])
@@ -554,7 +605,7 @@ class H(BaseHTTPRequestHandler):
         if p.startswith("/assets/"):
             k = p[8:]; return self.send(200, raw=assets[k], ctype="application/octet-stream") if k in assets else self.err(404,"not_found")
         if p == "/playlist": j = json.loads(playlist); j["ok"]=True; return self.send(200, j)
-        if p == "/config": return self.send(200, dict(cfg, ok=True))
+        if p == "/config": return self.send(200, cfg_view())
         if p == "/screenshot":
             # Screen-on session: the live framebuffer, so an animation on screen changes between two
             # screenshots (the mock moves a bar at 10 fps). Panel-off session: the static offscreen render.
@@ -579,7 +630,7 @@ class H(BaseHTTPRequestHandler):
             return self.send(200, {"ok":True,"enabled":cfg["ble_wake"],"name":"PixelClip-A1B2","service_uuid":BLE_SERVICE_UUID,"connected":False})
         if p == "/batlog": return self.send(200, raw=b"epoch,uptime_s,mv,pct,usb,mode,display,brightness\n1,2,3900,66,0,playing,on,160\n", ctype="text/csv")
         self.err(404,"not_found")
-    def do_PUT(self):
+    def put(self):
         global playlist
         p = self.path
         if p.startswith("/assets/"):
@@ -619,14 +670,14 @@ class H(BaseHTTPRequestHandler):
             if not re.fullmatch(ID_RE, k): self.body(); return self.err(400,"invalid_id")
             b = self.body()
             if len(b) > 16384: return self.err(413,"too_large")
-            try: j = json.loads(b)
+            try: j = jloads(b)
             except Exception: return self.err(422,"malformed")
             e = validate_font(j)
             if e: return self.err(*e)
             fonts[k] = j; return self.send(201, {"ok":True,"id":k,"size":len(b)})
         if p == "/playlist":
             b = self.body()
-            try: j = json.loads(b)
+            try: j = jloads(b)
             except Exception: return self.err(400,"bad_json")
             e = validate_playlist(j)
             if e: return self.err(*e)
@@ -642,16 +693,23 @@ class H(BaseHTTPRequestHandler):
             if "upload_timeout_s" in j and not 30 <= j["upload_timeout_s"] <= 1800: return self.err(422,"invalid_config")
             if any(k in j and not isinstance(j[k], bool) for k in CFG_BOOLS): return self.err(422,"invalid_config")
             if "orientation" in j and j["orientation"] not in ORIENTATIONS: return self.err(422,"invalid_config")
-            cfg.update(j); return self.send(200, dict(cfg, ok=True))
+            if "low_battery_pct" in j and not num_in(j["low_battery_pct"], 0, 20): return self.err(422,"invalid_config")
+            pw = j.get("ap_password")
+            if "ap_password" in j and not (isinstance(pw, str) and 8 <= len(pw) <= 63 and all(" " <= c <= "~" for c in pw)):
+                return self.err(422,"invalid_config")
+            cfg.update(j); return self.send(200, cfg_view())
         self.err(404,"not_found")
-    def do_POST(self):
+    def post(self):
         p = self.path
         if p == "/time":
             j = self.jbody()
+            if j is None: return self.err(400,"bad_json")
             if not (1600000000 <= j.get("epoch",0) <= 4102444800): return self.err(422,"invalid_time")
             clock["synced"]=True; clock["approx"]=False; clock["delta"]=j["epoch"]-time.time(); cfg["tz_offset_s"]=j.get("tz_offset_s",cfg["tz_offset_s"]); return self.send(200,{"ok":True})
         if p == "/brightness":
-            j = self.jbody(); v = j.get("value",-1)
+            j = self.jbody()
+            if j is None: return self.err(400,"bad_json")
+            v = j.get("value",-1)
             return self.send(200,{"ok":True}) if 0<=v<=255 else self.err(422,"invalid_brightness")
         if p == "/session/end" and cfg["wifi_always_on"]:
             self.body(); return self.send(200, {"ok":True,"always_on":True,"message":"wifi_always_on: the hotspot stays up"})
@@ -782,7 +840,7 @@ class H(BaseHTTPRequestHandler):
         if not src: return None
         it = {kk: v for kk, v in src.items() if kk not in ("id","asset","at","duration_ms","transition","from","until")}
         it.update(id=k); return it
-    def do_DELETE(self):
+    def delete(self):
         p = self.path
         if p.startswith("/assets/"):
             k=p[8:]

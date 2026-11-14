@@ -11,6 +11,8 @@ struct PixelClipApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        // Working copies of movies a crash (or a kill) left in tmp: no crop screen is open yet, so all of them.
+        MediaImporter.sweepTemporaryCopies()
         let library = LibraryStore(), session = ClipSession(), router = Router()
         _library = State(initialValue: library)
         _session = State(initialValue: session)

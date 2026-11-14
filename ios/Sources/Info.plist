@@ -28,13 +28,13 @@
 		<true/>
 	</dict>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>PixelClip uses Bluetooth to wake your clip and turn on its Wi‑Fi, so you don’t have to press its button.</string>
+	<string>PixelClip uses Bluetooth to find and wake your clip and to send it small updates.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>PixelClip sends pictures and settings to your clip over the clip’s own Wi‑Fi.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>PixelClip saves screenshots of your clip to your photo library when you ask.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>PixelClip uses the photos and videos you pick to make pictures for your clip.</string>
+	<key>PixelClipAppGroup</key>
+	<string>$(APP_GROUP_ID)</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Fonts/PressStart2P/PressStart2P-Regular.ttf</string>

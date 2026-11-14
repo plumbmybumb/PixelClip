@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "health.c" "coredump.c"
+    SRCS "health.c" "health_safe.c" "coredump.c"
     INCLUDE_DIRS "include"
     REQUIRES esp_common
     PRIV_REQUIRES esp_timer esp_system esp_rom esp_hw_support hal soc nvs_flash log espcoredump esp_partition heap

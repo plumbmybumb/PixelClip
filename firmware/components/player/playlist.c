@@ -26,6 +26,8 @@ typedef struct {
     int idx;
     char *msg;
     size_t msg_len;
+    char bundle_ok[33];    /* the oracle bundle checked last in this document ... */
+    uint16_t bundle_cards; /* ... for this many cards: one flash read per bundle, not one per item */
 } ctx_t;
 
 #define FAIL(code, ...) do { snprintf(c->msg, c->msg_len, __VA_ARGS__); return (code); } while (0)
@@ -481,7 +483,13 @@ static pl_status_t parse_oracle(ctx_t *c, const cJSON *it, pl_item_t *item, cons
     }
     char am[160];
     pl_status_t st = playlist_oracle_check(item, am, sizeof am);
-    if (st == PL_OK) st = oracle_bundle_check(item->id, item->orc.cards, am, sizeof am);
+    if (st == PL_OK && !(strcmp(c->bundle_ok, item->id) == 0 && item->orc.cards <= c->bundle_cards)) {
+        st = oracle_bundle_check(item->id, item->orc.cards, am, sizeof am);
+        if (st == PL_OK) {
+            strlcpy(c->bundle_ok, item->id, sizeof c->bundle_ok);
+            c->bundle_cards = item->orc.cards;
+        }
+    }
     if (st != PL_OK) {
         if (!c->lenient) FAIL(st, "%s: %s", where(c, w, sizeof w), am);
         ESP_LOGW(TAG, "%s: %s, skipped", where(c, w, sizeof w), am);
@@ -782,6 +790,13 @@ pl_status_t playlist_parse_show_item(const struct cJSON *obj, const char *id, pl
 esp_err_t playlist_store(const char *json, size_t len)
 {
     return storage_write_file(PLAYLIST_FILE, json, len);
+}
+
+bool playlist_set_aside(void)
+{
+    if (storage_file_size(PLAYLIST_FILE) < 0) return false;
+    if (storage_rename_file(PLAYLIST_FILE, "playlist.bad.json") != ESP_OK) storage_remove_file(PLAYLIST_FILE);
+    return true;
 }
 
 char *playlist_read_json(void)

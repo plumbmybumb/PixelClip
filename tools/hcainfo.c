@@ -28,6 +28,7 @@ int main(int argc, char **argv) {
     printf("  flags         0x%04x%s\n", h->flags, (h->flags & HCA_FLAG_GLYPH_ATLAS) ? " (glyph atlas)" : "");
 
     size_t npx = (size_t)h->width * h->height;
+    check_pixels(argv[1], h->width, h->height);
     uint16_t *buf = xmalloc(npx * 2);
     int bad = size < h->data_size;
     uint64_t total_ms = 0, comp_total = 0;

@@ -86,7 +86,7 @@ final class VirtualClipTests: XCTestCase {
         XCTAssertEqual(full.name, "Léa")
         XCTAssertEqual(full.brightness, 90)
         XCTAssertEqual(full.uploadTimeoutS, 120)
-        XCTAssertEqual(full.apPassword, "pixelclip-2026")
+        XCTAssertNil(full.apPassword, "the passphrase is write-only: no answer carries it (PROTOCOL §4)")
         await expectHTTP(422, "invalid_config") { _ = try await clip.putConfig(ClipConfig(uploadTimeoutS: 5)) }
         await expectHTTP(422, "invalid_config") { _ = try await clip.putConfig(ClipConfig(apPassword: "1234567")) }
         let cfg = try await clip.config()

@@ -1,4 +1,4 @@
-# Hair Clip — Waveshare ESP32-S3-AMOLED-1.91 (ESP32-S3R8, W25Q128 16 MB flash)
+# PixelClip — Waveshare ESP32-S3-AMOLED-1.91 (ESP32-S3R8, W25Q128 16 MB flash)
 CONFIG_IDF_TARGET="esp32s3"
 
 # Flash: QIO 80 MHz, 16 MB (schematic: W25Q128JV)
@@ -57,6 +57,21 @@ CONFIG_RTC_CLK_SRC_INT_8MD256=y
 # Compiler / logging
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# Cheap hardening (security audit WIFI-14). Neither option touches eFuses or the bootloader.
+# - Stack protector, normal mode: a canary in every function that has a local array of 8 bytes or more (or
+#   calls alloca), checked on return; an overrun of such a buffer becomes a clean panic ("Stack smashing protect
+#   failure") instead of a corrupted return address. Cost: 11.5 KB, 0.8 % of the image (measured: README
+#   "Hardening options") and two instructions on entry and exit of those functions only.
+# - Stack-end watchpoint: a hardware watchpoint on the last 32 bytes of the running task's stack, moved at every
+#   context switch. A stack overflow (deep recursion such as nested JSON, a too-large frame) panics at the first
+#   write instead of silently corrupting the heap block below the stack until the next context switch notices
+#   the broken canary. Cost: one debug register (gdb has one hardware watchpoint less) and a few instructions per
+#   context switch.
+# Light heap poisoning (CONFIG_HEAP_POISONING_LIGHT) is deliberately NOT enabled here: it costs 8 bytes of
+# internal RAM per live allocation, and that has to be measured on a clip first (README "Hardening options").
+CONFIG_COMPILER_STACK_CHECK_MODE_NORM=y
+CONFIG_FREERTOS_WATCHPOINT_END_OF_STACK=y
 
 # Tasks / watchdog
 # main = mode controller: runs esp_wifi_init / mdns_init / httpd_start / esp_wifi_deinit on its stack

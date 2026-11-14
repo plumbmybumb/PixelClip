@@ -861,7 +861,7 @@ public struct ClipConfig: Codable, Sendable, Equatable {
         public static let brightness = 0...255
         public static let uploadTimeoutS = 30...1800
         public static let apPasswordLength = 8...63
-        public static let lowBatteryPct = 0...50
+        public static let lowBatteryPct = 0...20   // the firmware's range (appcfg.c)
         public static let tzOffsetS = -50_400...50_400
     }
 
@@ -876,7 +876,7 @@ public struct ClipConfig: Codable, Sendable, Equatable {
                 return "The hotspot password must be 8–63 printable ASCII characters."
             }
         }
-        if let lowBatteryPct, !Limits.lowBatteryPct.contains(lowBatteryPct) { return "Low-battery level is 0–50 %." }
+        if let lowBatteryPct, !Limits.lowBatteryPct.contains(lowBatteryPct) { return "Low-battery level is 0–20 %." }
         if let tzOffsetS, !Limits.tzOffsetS.contains(tzOffsetS) { return "Time zone offset out of range." }
         return nil
     }

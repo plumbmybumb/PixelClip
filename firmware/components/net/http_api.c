@@ -8,6 +8,8 @@
 #include "net.h"
 
 #include <string.h>
+#include <strings.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -38,8 +40,14 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#include "lwip/sockets.h"
 
 static const char *TAG = "http";
+
+/* The build caps cJSON's nesting depth (firmware/json_limit.cmake, applied to ESP-IDF's `json` component in
+ * firmware/CMakeLists.txt): without the cap a body of a few hundred '[' overflows this task's stack (security
+ * audits WIFI-3 / PARSE-1). ESP-IDF's own default is 1000; fail the build if the definition did not arrive. */
+_Static_assert(CJSON_NESTING_LIMIT <= 16, "cJSON must be built with the firmware's nesting cap");
 
 #define PROTOCOL_VERSION 1
 #define HW_ID            "ws-amoled-1.91"
@@ -49,11 +57,13 @@ static const char *TAG = "http";
 #define ST_200 "200 OK"
 #define ST_201 "201 Created"
 #define ST_400 "400 Bad Request"
+#define ST_403 "403 Forbidden"
 #define ST_404 "404 Not Found"
 #define ST_408 "408 Request Timeout"
 #define ST_409 "409 Conflict"
 #define ST_411 "411 Length Required"
 #define ST_413 "413 Payload Too Large"
+#define ST_415 "415 Unsupported Media Type"
 #define ST_422 "422 Unprocessable Entity"
 #define ST_500 "500 Internal Server Error"
 #define ST_503 "503 Service Unavailable"
@@ -150,10 +160,8 @@ static esp_err_t read_body(api_req_t *req, size_t max, const char **out, size_t 
             return ESP_FAIL;
         }
         size_t got = 0;
-        int timeouts = 0;
         while (got < req->content_len) {
-            int n = req->ops->recv(req, buf + got, req->content_len - got);
-            if (n == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts < 3) continue;
+            int n = req->ops->recv(req, buf + got, req->content_len - got);   /* waits as long as the slow-client guard allows */
             if (n <= 0) {
                 free(buf);
                 send_error(req, ST_408, "recv_failed", "body not received");
@@ -171,12 +179,30 @@ static esp_err_t read_body(api_req_t *req, size_t max, const char **out, size_t 
     return ESP_OK;
 }
 
+/* PROTOCOL §4 "Request checks": over HTTP a JSON body must be declared as application/json (parameters such as
+ * "; charset=utf-8" are fine). A web page can only send text/plain, form or multipart bodies to another origin
+ * without a preflight, so this is what keeps a page in the phone's browser from driving the JSON routes while
+ * the phone is on the hotspot (security audit WIFI-4). The fast lane has no headers and nothing to check. On
+ * failure the 415 has been sent. */
+static bool json_type_ok(api_req_t *req)
+{
+    if (!req->ops->header || req->content_len == 0) return true;
+    char v[48];
+    if (req->ops->header(req, "Content-Type", v, sizeof v) && strcspn(v, "; \t") == 16 &&
+        strncasecmp(v, "application/json", 16) == 0) {
+        return true;
+    }
+    send_error(req, ST_415, "unsupported_media_type", "send JSON bodies with Content-Type: application/json");
+    return false;
+}
+
 /* Parse a JSON object body; an empty body yields an empty object. */
 static cJSON *read_json(api_req_t *req, size_t max)
 {
     const char *buf;
     size_t len;
     if (req->content_len == 0) return cJSON_CreateObject();
+    if (!json_type_ok(req)) return NULL;
     if (read_body(req, max, &buf, &len) != ESP_OK) return NULL;
     cJSON *j = cJSON_ParseWithLength(buf, len);
     if (!cJSON_IsObject(j)) {
@@ -408,19 +434,16 @@ static esp_err_t h_asset_put(api_req_t *req)
         return send_no_memory(req, "the upload buffer");
     }
     size_t left = req->content_len;
-    int timeouts = 0;
     player_upload_active(true);   /* scenes at 15 fps while the body streams into flash */
     while (left > 0 && st == STORAGE_OK) {
         int n = req->ops->recv(req, buf, left < IO_CHUNK ? left : IO_CHUNK);
-        if (n == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts < 3) continue;
-        if (n <= 0) {
+        if (n <= 0) {   /* closed, stalled or too slow (slow-client guard), or the session is ending */
             player_upload_active(false);
             free(buf);
             storage_asset_write_abort(w);
-            ESP_LOGW(TAG, "upload %s: connection lost with %u bytes left", id, (unsigned)left);
-            return ESP_FAIL; /* socket is dead; httpd closes it */
+            ESP_LOGW(TAG, "upload %s: abandoned with %u bytes left", id, (unsigned)left);
+            return ESP_FAIL; /* httpd closes the socket */
         }
-        timeouts = 0;
         st = storage_asset_write(w, buf, (size_t)n);
         left -= (size_t)n;
         if ((left & 0xFFFF) < IO_CHUNK) net_touch(); /* long uploads must not trip the idle timer */
@@ -508,6 +531,7 @@ static esp_err_t h_playlist_put(api_req_t *req)
 {
     const char *buf;
     size_t len;
+    if (!json_type_ok(req)) return ESP_OK;
     if (read_body(req, PLAYLIST_MAX_BYTES, &buf, &len) != ESP_OK) return ESP_OK;
     char msg[128] = "";
     pl_status_t st = playlist_parse(buf, len, NULL, msg, sizeof msg);
@@ -546,6 +570,14 @@ static esp_err_t h_config_put(api_req_t *req)
 {
     cJSON *patch = read_json(req, JSON_SMALL_MAX);
     if (!patch) return ESP_OK;
+    /* The hotspot passphrase is the key to everything WiFi offers (uploads, firmware updates). The fast lane has
+     * no pairing, so anyone in Bluetooth range could set it and lock the owner out: over BLE the key is refused
+     * with the fast lane's usual "do this over WiFi" answer (security audits WIFI-1 / BLE-2). The lookup is
+     * case-insensitive on purpose (broader than the case-sensitive merge). Nothing of the patch is applied. */
+    if (req->ble && cJSON_HasObjectItem(patch, "ap_password")) {
+        cJSON_Delete(patch);
+        return send_error(req, ST_413, "use_wifi", "ap_password can only be set over the WiFi hotspot");
+    }
     char msg[128] = "";
     esp_err_t err = appcfg_merge_json(patch, msg, sizeof msg);
     bool brightness_changed = cJSON_HasObjectItem(patch, "brightness");
@@ -788,17 +820,14 @@ static esp_err_t h_ota(api_req_t *req)
         return send_no_memory(req, "the upload buffer");
     }
     size_t left = req->content_len;
-    int timeouts = 0;
     while (left > 0) {
         int n = req->ops->recv(req, buf, left < IO_CHUNK ? left : IO_CHUNK);
-        if (n == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts < 3) continue;
-        if (n <= 0) {
+        if (n <= 0) {   /* closed, stalled or too slow (slow-client guard), or the session is ending */
             free(buf);
             ota_abort(s);
-            ESP_LOGW(TAG, "OTA: connection lost");
+            ESP_LOGW(TAG, "OTA: abandoned with %u bytes left", (unsigned)left);
             return ESP_FAIL;
         }
-        timeouts = 0;
         err = ota_write(s, buf, (size_t)n);
         if (err != ESP_OK) {
             free(buf);
@@ -1117,19 +1146,16 @@ static esp_err_t h_text_put(api_req_t *req)
         return send_no_memory(req, "the upload buffer");
     }
     size_t left = req->content_len;
-    int timeouts = 0;
     player_upload_active(true);
     while (left > 0 && st == STORAGE_OK) {
         int n = req->ops->recv(req, buf, left < IO_CHUNK ? left : IO_CHUNK);
-        if (n == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts < 3) continue;
-        if (n <= 0) {
+        if (n <= 0) {   /* closed, stalled or too slow (slow-client guard), or the session is ending */
             player_upload_active(false);
             free(buf);
             reader_text_write_abort(w);
-            ESP_LOGW(TAG, "text %s: connection lost with %u bytes left", id, (unsigned)left);
+            ESP_LOGW(TAG, "text %s: abandoned with %u bytes left", id, (unsigned)left);
             return ESP_FAIL;
         }
-        timeouts = 0;
         st = reader_text_write(w, buf, (size_t)n);
         left -= (size_t)n;
         if ((left & 0xFFFF) < IO_CHUNK) net_touch();
@@ -1237,6 +1263,7 @@ static esp_err_t h_font_put(api_req_t *req)
     }
     const char *buf;
     size_t len;
+    if (!json_type_ok(req)) return ESP_OK;
     if (read_body(req, READER_FONT_MAX_BYTES, &buf, &len) != ESP_OK) return ESP_OK;
     char msg[160] = "";
     esp_err_t v = reader_font_validate(buf, len, msg, sizeof msg);
@@ -1387,9 +1414,12 @@ esp_err_t api_bad_method(api_req_t *req)
 
 /* ------------------------------------------------------------------ routes (shared by both transports) */
 
-/* Order matters (first match wins, as in esp_http_server). `bulk` = WiFi only: PROTOCOL §3b lists
- * PUT /assets/{id}, PUT /texts/{id}, POST /ota, GET /screenshot, GET /assets/{id} and GET /batlog
- * (plus the GET /coredump extension). */
+/* Order matters (first match wins, as in esp_http_server). The last column = WiFi only (api_route_t.wifi_only):
+ * the bulk transfers of PROTOCOL §3b (PUT /assets/{id}, PUT /texts/{id}, POST /ota, GET /screenshot,
+ * GET /assets/{id}, GET /batlog, plus the GET /coredump extension), and the three development / bench routes
+ * that the unpaired BLE link must not offer (security audits WIFI-10 / BLE-9): GET /imu (the wearer's head
+ * motion), POST /imu/calibrate (replaces or erases the stored axis map) and POST /queue/test. The app only
+ * calls /imu and /imu/calibrate after it has joined the hotspot (its calibration wizard connects first). */
 const api_route_t api_routes[] = {
     { "/status",        HTTP_GET,    h_status,        false },
     { "/assets",        HTTP_GET,    h_assets_list,   false },
@@ -1406,15 +1436,15 @@ const api_route_t api_routes[] = {
     { "/oracle/turn",   HTTP_POST,   h_oracle_turn,   false },
     { "/oracle/back",   HTTP_POST,   h_oracle_back,   false },   /* §5f.3 extension: the previous screen */
     { "/next",          HTTP_POST,   h_next,          false },
-    { "/queue/test",    HTTP_POST,   h_queue_test,    false },
+    { "/queue/test",    HTTP_POST,   h_queue_test,    true  },   /* development aid: WiFi only */
     { "/prev",          HTTP_POST,   h_prev,          false },
     { "/brightness",    HTTP_POST,   h_brightness,    false },
     { "/screenshot",    HTTP_GET,    h_screenshot,    true  },
     { "/ota",           HTTP_POST,   h_ota,           true  },
     { "/session/end",   HTTP_POST,   h_session_end,   false },
     { "/batlog",        HTTP_GET,    h_batlog_get,    true  },
-    { "/imu",           HTTP_GET,    h_imu,           false },
-    { "/imu/calibrate", HTTP_POST,   h_imu_calibrate, false },
+    { "/imu",           HTTP_GET,    h_imu,           true  },   /* bench: WiFi only */
+    { "/imu/calibrate", HTTP_POST,   h_imu_calibrate, true  },
     { "/scenes",        HTTP_GET,    h_scenes,        false },
     { "/batlog",        HTTP_DELETE, h_batlog_delete, false },
     { "/coredump",      HTTP_GET,    h_coredump_get,  true  },   /* README "Crash diagnostics" */
@@ -1480,6 +1510,162 @@ void http_api_init(void)
 
 /* ------------------------------------------------------------------ esp_http_server adapter */
 
+/* Slow-client guard (security audit WIFI-8).
+ *
+ * esp_http_server serves every connection on one task, and the controller (which feeds the RTC watchdog) waits
+ * for that task when a session ends. A client that trickles its request, stops sending in the middle of an upload
+ * or stops reading a response used to keep the task inside the server (no liveness beat: an RTC watchdog reset
+ * after about 70 s), or kept the session end waiting until it was done. Now every socket call of the server goes
+ * through http_sock_recv / http_sock_send (installed per connection by http_api_on_open), which
+ *   - beat the httpd liveness source: the sockets time out after HTTP_SOCK_TIMEOUT_S (5 s), so a waiting task
+ *     checks in at least that often and only a task that is really stuck goes silent;
+ *   - fail as soon as the session is ending (http_api_stopping): the handler abandons its request cleanly (temp
+ *     file removed, OTA aborted) and httpd_stop() returns within one socket timeout;
+ *   - bound the request line + headers: HTTP_HEADER_MS in all (they are at most 1.2 KB: one or two packets).
+ * and the body / response rules below, which are deliberately far outside anything a working link does:
+ *   - silence: HTTP_RX_SILENCE_MS (30 s, what three 10 s timeouts allowed before) without a single body byte, or
+ *     HTTP_TX_SILENCE_MS (10 s, the old send timeout) without the client taking a byte, ends the request;
+ *   - floor: whenever the server has spent HTTP_FLOOR_WINDOW_MS (30 s) blocked on the client, in either
+ *     direction, at least HTTP_FLOOR_BYTES (4 KB) must have moved in that time. Only time spent waiting for the
+ *     client counts (not flash writes, hashing or decoding), so a slow clip never trips it. 4 KB per 30 s is
+ *     137 B/s: a 1 MB picture would take two hours at that rate, while the app gives a whole transfer 5 minutes
+ *     and gives up itself after 20 s (assets) to 60 s (firmware) without progress. A several-MB upload over a
+ *     poor link (tens of KB/s, with stalls of seconds) is nowhere near either rule.
+ * A body the handler did not read (an early error, a route without a body) is drained here under the same
+ * rules, with the upload buffer instead of the server's own purge loop, so the answer reaches the client as it
+ * did before; a declared body larger than the clip's whole flash is not read at all (the connection closes).
+ * The idle timer of the session is refreshed while bytes move (at most once a second), so a long transfer
+ * never times the session out underneath itself. */
+#define HTTP_HEADER_MS         10000
+#define HTTP_RX_SILENCE_MS     30000
+#define HTTP_TX_SILENCE_MS     10000
+#define HTTP_FLOOR_WINDOW_MS   30000
+#define HTTP_FLOOR_BYTES       4096
+#define HTTP_STOP_GRACE_MS     3000                   /* a response already on its way when the session ends */
+#define HTTP_DRAIN_MAX         (16u * 1024 * 1024)    /* the flash size: no legitimate body is larger */
+
+typedef struct {
+    int64_t wait_us;      /* time blocked on the client in the current window */
+    size_t bytes;         /* bytes moved in it */
+} http_floor_t;
+
+/* All of it belongs to the httpd task (one request at a time), except `stopping`. */
+static struct {
+    bool in_request;      /* a route / error handler owns the connection (else: request line + headers) */
+    int hdr_fd;           /* the connection whose headers are being read ... */
+    int64_t hdr_t0_us;    /* ... since when (0 = no request begun) */
+    size_t consumed;      /* body bytes of this request read so far */
+    http_floor_t rx, tx;
+    int64_t touch_us;     /* last idle-timer refresh from a transfer */
+    int64_t stop_wait_us; /* time a send blocked after the session began to end */
+} s_http;
+static volatile bool s_http_stopping;
+
+void http_api_stopping(bool stopping) { s_http_stopping = stopping; }
+
+/* Account `waited_us` blocked on the client and `n` bytes moved; false when the floor is not met. */
+static bool http_floor_ok(http_floor_t *f, int64_t waited_us, size_t n)
+{
+    f->wait_us += waited_us;
+    f->bytes += n;
+    if (f->wait_us < (int64_t)HTTP_FLOOR_WINDOW_MS * 1000) return true;
+    const bool ok = f->bytes >= HTTP_FLOOR_BYTES;
+    f->wait_us = 0;
+    f->bytes = 0;
+    return ok;
+}
+
+/* Bytes are moving in a request: keep the session's idle timer away (at most once a second). */
+static void http_transfer_touch(int64_t now)
+{
+    if (!s_http.in_request || now - s_http.touch_us < 1000000) return;
+    s_http.touch_us = now;
+    net_touch();
+}
+
+static int http_sock_errno(void)
+{
+    switch (errno) {
+    case EAGAIN:
+#if EWOULDBLOCK != EAGAIN
+    case EWOULDBLOCK:
+#endif
+    case EINTR: return HTTPD_SOCK_ERR_TIMEOUT;
+    case EINVAL:
+    case EBADF:
+    case EFAULT:
+    case ENOTSOCK: return HTTPD_SOCK_ERR_INVALID;
+    default: return HTTPD_SOCK_ERR_FAIL;
+    }
+}
+
+/* One recv() of the server: request line and headers (outside a handler, bounded here), or one read of a body
+ * (inside one: http_recv below owns the waiting rules). */
+static int http_sock_recv(httpd_handle_t hd, int fd, char *buf, size_t len, int flags)
+{
+    if (!buf) return HTTPD_SOCK_ERR_INVALID;
+    if (s_http_stopping) return HTTPD_SOCK_ERR_FAIL;
+    if (!s_http.in_request) {
+        const int64_t now = esp_timer_get_time();
+        if (s_http.hdr_fd != fd || s_http.hdr_t0_us == 0) {
+            s_http.hdr_fd = fd;
+            s_http.hdr_t0_us = now;
+        } else if (now - s_http.hdr_t0_us > (int64_t)HTTP_HEADER_MS * 1000) {
+            ESP_LOGW(TAG, "request headers not complete after %d s: closing the connection", HTTP_HEADER_MS / 1000);
+            s_http.hdr_t0_us = 0;
+            return HTTPD_SOCK_ERR_TIMEOUT;   /* the server answers 408 and closes */
+        }
+    }
+    const int n = recv(fd, buf, len, flags);
+    health_beat(HEALTH_SRC_HTTPD);   /* data, or a bounded timeout: the task is not wedged */
+    return n < 0 ? http_sock_errno() : n;
+}
+
+/* One send() of the server (a response, whole or in chunks). The server gives up on the first timeout, so the
+ * waiting rules for a client that reads slowly or not at all live here. */
+static int http_sock_send(httpd_handle_t hd, int fd, const char *buf, size_t len, int flags)
+{
+    if (!buf) return HTTPD_SOCK_ERR_INVALID;
+    int64_t silent_us = 0;
+    for (;;) {
+        const int64_t t0 = esp_timer_get_time();
+        const int n = send(fd, buf, len, flags);
+        const int64_t now = esp_timer_get_time();
+        health_beat(HEALTH_SRC_HTTPD);
+        const int err = n < 0 ? http_sock_errno() : 0;
+        if (n < 0 && err != HTTPD_SOCK_ERR_TIMEOUT) return err;
+        if (s_http_stopping) {
+            /* The session is ending: a response that goes out without waiting still does; one that makes the
+             * server wait gets HTTP_STOP_GRACE_MS in all. */
+            s_http.stop_wait_us += now - t0;
+            if (n < 0 || s_http.stop_wait_us > (int64_t)HTTP_STOP_GRACE_MS * 1000) return HTTPD_SOCK_ERR_FAIL;
+        }
+        /* (the server's own short error answers, outside a request, are not held to the floor) */
+        if (s_http.in_request && !http_floor_ok(&s_http.tx, now - t0, n > 0 ? (size_t)n : 0)) {
+            ESP_LOGW(TAG, "client reads slower than %d B per %d s: closing the connection", HTTP_FLOOR_BYTES,
+                     HTTP_FLOOR_WINDOW_MS / 1000);
+            return HTTPD_SOCK_ERR_FAIL;
+        }
+        if (n >= 0) {
+            http_transfer_touch(now);
+            return n;
+        }
+        silent_us += now - t0;
+        if (silent_us >= (int64_t)HTTP_TX_SILENCE_MS * 1000) {
+            ESP_LOGW(TAG, "client took nothing for %d s: closing the connection", HTTP_TX_SILENCE_MS / 1000);
+            return HTTPD_SOCK_ERR_TIMEOUT;
+        }
+    }
+}
+
+esp_err_t http_api_on_open(httpd_handle_t server, int sockfd)
+{
+    if (s_http.hdr_fd == sockfd) s_http.hdr_t0_us = 0;   /* a new connection on a recycled descriptor */
+    esp_err_t err = httpd_sess_set_recv_override(server, sockfd, http_sock_recv);
+    if (err == ESP_OK) err = httpd_sess_set_send_override(server, sockfd, http_sock_send);
+    return err;
+}
+
 static esp_err_t http_send(api_req_t *r, const char *status, const char *type, const char *data, size_t len)
 {
     httpd_req_t *req = r->ctx;
@@ -1497,11 +1683,36 @@ static esp_err_t http_send_chunk(api_req_t *r, const char *type, const char *dat
     return httpd_resp_send_chunk(req, data, data ? (ssize_t)len : 0);
 }
 
+/* Body bytes for a handler: > 0, or <= 0 when the request is over for it (the client closed, sent nothing for
+ * HTTP_RX_SILENCE_MS, fell below the floor, or the session is ending). Never HTTPD_SOCK_ERR_TIMEOUT: the waiting
+ * happens here, in HTTP_SOCK_TIMEOUT_S steps, each with a liveness beat (http_sock_recv). */
 static int http_recv(api_req_t *r, char *buf, size_t len)
 {
-    const int n = httpd_req_recv((httpd_req_t *)r->ctx, buf, len);
-    health_beat(HEALTH_SRC_HTTPD);   /* a received chunk or a bounded (10 s) timeout: the task is not wedged */
-    return n;
+    httpd_req_t *req = r->ctx;
+    int64_t silent_us = 0;
+    for (;;) {
+        const int64_t t0 = esp_timer_get_time();
+        const int n = httpd_req_recv(req, buf, len);
+        const int64_t now = esp_timer_get_time();
+        health_beat(HEALTH_SRC_HTTPD);
+        if (n != HTTPD_SOCK_ERR_TIMEOUT && n <= 0) return n;
+        if (n > 0) s_http.consumed += (size_t)n;
+        if (!http_floor_ok(&s_http.rx, now - t0, n > 0 ? (size_t)n : 0)) {
+            ESP_LOGW(TAG, "%s %s: body slower than %d B per %d s: giving up", r->method_name, r->uri, HTTP_FLOOR_BYTES,
+                     HTTP_FLOOR_WINDOW_MS / 1000);
+            return HTTPD_SOCK_ERR_FAIL;
+        }
+        if (n > 0) {
+            http_transfer_touch(now);
+            return n;
+        }
+        silent_us += now - t0;
+        if (s_http_stopping || silent_us >= (int64_t)HTTP_RX_SILENCE_MS * 1000) {
+            ESP_LOGW(TAG, "%s %s: %s: giving up", r->method_name, r->uri,
+                     s_http_stopping ? "the session is ending" : "no body bytes for 30 s");
+            return HTTPD_SOCK_ERR_FAIL;
+        }
+    }
 }
 
 static bool http_header(api_req_t *r, const char *name, char *out, size_t out_len)
@@ -1516,6 +1727,7 @@ static const api_ops_t s_http_ops = {
     .header = http_header,
 };
 
+/* A request reached a handler (a route's, or the 404 / 405 answers): its headers are in. */
 static void http_req_init(api_req_t *r, httpd_req_t *req)
 {
     memset(r, 0, sizeof *r);
@@ -1528,6 +1740,68 @@ static void http_req_init(api_req_t *r, httpd_req_t *req)
     r->ops = &s_http_ops;
     r->ctx = req;
     r->transport = "http";
+    s_http.in_request = true;
+    s_http.consumed = 0;
+    s_http.rx = s_http.tx = (http_floor_t){ 0 };
+    s_http.stop_wait_us = 0;
+    s_http.touch_us = esp_timer_get_time();   /* the caller has just touched the idle timer */
+}
+
+/* The request is answered: read what is left of its body (see the guard above), then hand the connection back
+ * to the server. ESP_FAIL makes the server close it. */
+static esp_err_t http_req_done(api_req_t *r, esp_err_t err)
+{
+    size_t left = r->content_len > s_http.consumed ? r->content_len - s_http.consumed : 0;
+    if (err == ESP_OK && left > 0) {
+        char small[128];
+        char *buf = left > sizeof small ? io_alloc(IO_CHUNK) : NULL;
+        char *dst = buf ? buf : small;
+        const size_t cap = buf ? IO_CHUNK : sizeof small;
+        if (left > HTTP_DRAIN_MAX) {
+            ESP_LOGW(TAG, "%s %s: %u unread body bytes: closing the connection", r->method_name, r->uri, (unsigned)left);
+            err = ESP_FAIL;
+        }
+        while (err == ESP_OK && left > 0) {
+            const int n = http_recv(r, dst, left < cap ? left : cap);
+            if (n <= 0) err = ESP_FAIL;
+            else left -= (size_t)n;
+        }
+        free(buf);
+    }
+    s_http.in_request = false;
+    s_http.hdr_t0_us = 0;   /* the next bytes on any connection start a new request */
+    return err;
+}
+
+/* PROTOCOL §4 "Request checks" (security audit WIFI-4), HTTP only. The clip serves no web pages, so no request
+ * of its own clients (the app's URLSession, curl, the scripts) is ever made by a page:
+ *   - Origin: browsers add it to every cross-origin request that can change state (and to every fetch that
+ *     wants to read the answer). Any request that carries one is refused, as is one whose Sec-Fetch-Site says
+ *     it was started by another site;
+ *   - Host must name this clip (its address or pixelclip.local, with or without ":80"): a page that points its
+ *     own host name at 192.168.4.1 (DNS rebinding) would otherwise be same-origin with the whole API. A
+ *     request without Host is served: only HTTP/1.0 tools send none, a browser always sends one, and a client
+ *     that is not a browser could write any Host it likes, so refusing it would protect nothing.
+ * On refusal the 403 has been sent. The fast lane has no headers and is not checked. */
+static bool http_request_allowed(httpd_req_t *req, api_req_t *r)
+{
+    char v[64];
+    if (httpd_req_get_hdr_value_len(req, "Origin") > 0) {
+        send_error(r, ST_403, "cross_origin", "requests from web pages are not served");
+        return false;
+    }
+    if (httpd_req_get_hdr_value_len(req, "Sec-Fetch-Site") > 0 &&
+        !(httpd_req_get_hdr_value_str(req, "Sec-Fetch-Site", v, sizeof v) == ESP_OK &&
+          (strcasecmp(v, "none") == 0 || strcasecmp(v, "same-origin") == 0))) {
+        send_error(r, ST_403, "cross_origin", "requests from web pages are not served");
+        return false;
+    }
+    if (httpd_req_get_hdr_value_len(req, "Host") > 0 &&
+        !(httpd_req_get_hdr_value_str(req, "Host", v, sizeof v) == ESP_OK && net_host_allowed(v))) {
+        send_error(r, ST_403, "bad_host", "address the clip as 192.168.4.1 or pixelclip.local");
+        return false;
+    }
+    return true;
 }
 
 /* Every route is registered with this trampoline; user_ctx is its api_routes[] entry. */
@@ -1539,12 +1813,17 @@ static esp_err_t http_dispatch(httpd_req_t *req)
     http_req_init(&r, req);
     health_beat(HEALTH_SRC_HTTPD);
     health_note_http(r.method_name, r.uri, true);   /* RTC crumb: the request in flight if the clip dies */
-    api_lock(UINT32_MAX);
-    esp_err_t err = rt->handler(&r);
-    api_unlock();
+    esp_err_t err = ESP_OK;
+    if (http_request_allowed(req, &r)) {
+        api_lock(UINT32_MAX);
+        err = rt->handler(&r);
+        api_unlock();
+    }
+    free(r.body_owned);
+    r.body_owned = NULL;
+    err = http_req_done(&r, err);   /* outside the handler lock: a slow leftover body must not hold the fast lane up */
     health_note_http(NULL, NULL, false);
     health_beat(HEALTH_SRC_HTTPD);
-    free(r.body_owned);
     return err;
 }
 
@@ -1553,7 +1832,7 @@ static esp_err_t http_not_found(httpd_req_t *req, httpd_err_code_t code)
     net_touch();
     api_req_t r;
     http_req_init(&r, req);
-    return api_not_found(&r);
+    return http_req_done(&r, api_not_found(&r));
 }
 
 static esp_err_t http_bad_method(httpd_req_t *req, httpd_err_code_t code)
@@ -1561,7 +1840,7 @@ static esp_err_t http_bad_method(httpd_req_t *req, httpd_err_code_t code)
     net_touch();
     api_req_t r;
     http_req_init(&r, req);
-    return api_bad_method(&r);
+    return http_req_done(&r, api_bad_method(&r));
 }
 
 esp_err_t http_api_register(httpd_handle_t server)

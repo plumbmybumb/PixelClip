@@ -20,7 +20,7 @@ final class ClipLinkBroker: ClipLinks {
 
     private var transport: BLETransport?
     private var lane: FastLaneClipClient?
-    static let log = Logger(subsystem: "com.example.pixelclip", category: "fastlane")
+    static let log = Logger(subsystem: AppLog.subsystem, category: "fastlane")
 
     init(doorbell: any DoorbellRinging, joiner: HotspotJoiner) {
         self.doorbell = doorbell
@@ -36,7 +36,10 @@ final class ClipLinkBroker: ClipLinks {
         if let transport, transport.link === link, let lane { return lane }
         let t = BLETransport(link: link)
         t.onExchange = { e in
-            Self.log.notice("fast lane: \(e.summary, privacy: .public)")
+            // The route's id (a picture's or a text's) stays private; the rest is the app's own counting.
+            let (kind, id) = AppLog.routeParts(e.route)
+            let rest = e.summary.dropFirst(e.route.line.count)
+            Self.log.notice("fast lane: \(kind, privacy: .public)\(id ?? "", privacy: .private(mask: .hash))\(rest, privacy: .public)")
             #if DEBUG
             print("FASTLANE \(e.summary)")
             #endif

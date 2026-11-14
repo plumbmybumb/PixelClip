@@ -83,7 +83,9 @@ final class ReaderStore {
             .appendingPathComponent("Reader", isDirectory: true)
         for sub in ["texts", "fonts"] {
             try? FileManager.default.createDirectory(at: dir.appendingPathComponent(sub), withIntermediateDirectories: true)
+            DataProtection.protect(dir.appendingPathComponent(sub), .afterFirstUnlock)
         }
+        DataProtection.protect(dir, .afterFirstUnlock)
         let stored = defaults.integer(forKey: Keys.wpm)
         wpm = stored == 0 ? RSVPTiming.defaultWPM : min(max(stored, RSVPTiming.appWPMRange.lowerBound), RSVPTiming.appWPMRange.upperBound)
         typeface = defaults.data(forKey: Keys.typeface).flatMap { try? JSONDecoder().decode(FontSelection.self, from: $0) } ?? Self.defaultTypeface
@@ -302,30 +304,105 @@ final class ReaderStore {
 
     // MARK: Share inbox
 
+    /// Reading one shared item (decoding it and extracting its text) may take this long before it is given up on.
+    static let inboxParseDeadline = 20.0
+
+    @ObservationIgnored private lazy var inboxClaims: InboxClaims? = ReaderInbox.directory().map { InboxClaims(inbox: $0) }
+    /// Links this run has already said "will try again" about.
+    @ObservationIgnored private var announcedRetries: Set<String> = []
+
+    /// What reading a claimed inbox file (off the main actor) came to.
+    private enum Opened: Sendable {
+        case text(ImportedText)
+        /// Nothing in it but a link: to be fetched.
+        case link(ReaderInboxItem)
+    }
+
     /// Import what the Share Extension saved (called when the app becomes active).
+    ///
+    /// A shared item is somebody else's page, book or link, so it is handled so that it can't hurt twice:
+    /// each file is **claimed** (moved to `Processing/`) before anything reads it, read off the main
+    /// actor under a deadline, and deleted when done. Whatever a run that died left claimed is dropped
+    /// here, unread, with a line for the person. Texts and pages first; links (which need the network)
+    /// after, each asked for a few times at most (`LinkRetry`).
     func importInbox() async {
-        guard !importingInbox else { return }
+        guard !importingInbox, let claims = inboxClaims else { return }
         importingInbox = true
         defer { importingInbox = false }
         var problem: String?
-        for (url, item) in ReaderInbox.pending() {
+        if !claims.dropAbandoned().isEmpty { problem = "A shared item couldn’t be opened." }
+
+        var links: [URL] = []
+        for file in claims.pending() where file.pathExtension == "json" {
+            guard let claimed = claims.claim(file) else { continue }
             do {
-                let text = try await Self.importedText(item)
-                var t = text
-                t.kind = .shared
-                add(t)
-                ReaderInbox.remove(url)
+                switch try await withDeadline(seconds: Self.inboxParseDeadline, priority: .userInitiated, { try Self.open(claimed) }) {
+                case .text(var text):
+                    text.kind = .shared
+                    add(text)
+                    claims.finish(claimed)
+                case .link:
+                    claims.release(claimed)   // back in the inbox, unread by the network, for the second pass
+                    links.append(file)
+                }
             } catch {
-                problem = "Couldn’t open a shared link: \((error as? LocalizedError)?.errorDescription ?? "check your connection.")"
-                // Keep a link for next time unless it's been waiting more than a day.
-                if Date().timeIntervalSince(item.createdAt) > 86_400 { ReaderInbox.remove(url) }
+                claims.finish(claimed)
+                problem = error is DeadlineExceeded ? "A shared item took too long to open."
+                    : "A shared item couldn’t be opened: \((error as? LocalizedError)?.errorDescription ?? "it can’t be read.")"
+            }
+        }
+
+        for file in links {
+            guard let claimed = claims.claim(file) else { continue }
+            guard let item = await Task.detached(operation: { Self.item(at: claimed) }).value, let url = item.url else {
+                claims.finish(claimed)
+                continue
+            }
+            do {
+                var text = try await TextImporter.fetch(url)
+                text.kind = .shared
+                add(text)
+                claims.finish(claimed)
+            } catch {
+                let why = (error as? LocalizedError)?.errorDescription ?? "check your connection."
+                switch LinkRetry.decide(after: error, attempts: item.attempts ?? 0, age: Date().timeIntervalSince(item.createdAt)) {
+                case .drop:
+                    claims.finish(claimed)
+                    problem = "Couldn’t open a shared link: \(why)"
+                case .keep(let attempts):
+                    var kept = item
+                    kept.attempts = attempts
+                    if let data = try? ReaderInbox.encoded(kept) { try? data.write(to: claimed, options: [.atomic, .completeFileProtection]) }
+                    claims.release(claimed)
+                    if announcedRetries.insert(item.id).inserted { problem = "Couldn’t open a shared link yet. PixelClip will try again." }
+                }
             }
         }
         inboxProblem = problem
     }
 
-    static func importedText(_ item: ReaderInboxItem) async throws -> ImportedText {
-        if let html = item.html, !html.isEmpty {
+    /// The item in an inbox file, or nil when the file is too big, unreadable or not an item.
+    nonisolated private static func item(at file: URL) -> ReaderInboxItem? {
+        guard let size = InboxClaims.size(of: file), size <= ReaderInbox.maxFileBytes,
+              let data = try? Data(contentsOf: file) else { return nil }
+        return ReaderInbox.decoded(data)
+    }
+
+    /// Reads a claimed inbox file: its text, or the link to fetch. Runs off the main actor.
+    nonisolated private static func open(_ file: URL) throws -> Opened {
+        guard let size = InboxClaims.size(of: file) else { throw TextImportError.unreadable }
+        guard size <= ReaderInbox.maxFileBytes else { throw TextImportError.tooLarge }
+        guard let item = item(at: file) else { throw TextImportError.unreadable }
+        if let text = try importedText(item) { return .text(text) }
+        guard let url = item.url else { throw TextImportError.empty }
+        guard TextImporter.isWebLink(url) else { throw TextImportError.blockedLink }
+        return .link(item)
+    }
+
+    /// The text of a shared item that carries one (a page's HTML, a note); nil when it is only a link.
+    nonisolated static func importedText(_ item: ReaderInboxItem) throws -> ImportedText? {
+        // A page too big to parse falls back to its visible text, then to its link.
+        if let html = item.html, !html.isEmpty, html.utf8.count <= TextImporter.Limits.standard.pageBytes {
             var t = TextImporter.html(html, url: item.url)
             if t.body.split(separator: " ").count < 30, let text = item.text, !text.isEmpty {
                 t = TextImporter.plain(text, fallbackTitle: item.title, kind: .web)
@@ -340,8 +417,8 @@ final class ReaderStore {
             t.sourceURL = item.url
             return t
         }
-        if let url = item.url { return try await TextImporter.fetch(url) }
-        throw TextImportError.empty
+        if item.url == nil, item.html?.isEmpty == false { throw TextImportError.tooLarge }
+        return nil
     }
 
     func dismissInboxProblem() { inboxProblem = nil }

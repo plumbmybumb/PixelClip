@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 """Fetch the bundled marquee fonts (SIL Open Font License only) from the google/fonts repository.
 
-    python3 -I tools/fonts/fetch_fonts.py            # download, verify, write everything
+    python3 -I tools/fonts/fetch_fonts.py            # download again and verify against FONTS.json
     python3 -I tools/fonts/fetch_fonts.py --check    # re-verify what is already on disk (no network)
+    python3 -I tools/fonts/fetch_fonts.py --update   # accept new or changed files (after moving PIN)
 
-For each family in FAMILIES it reads `ofl/<dir>/METADATA.pb`, refuses anything whose licence is not
-"OFL", downloads the static TTFs (Regular, plus Bold / Italic / Bold Italic when the family has them;
-the variable TTFs for variable-only families) and the family's OFL.txt, checks the TrueType/OpenType
-magic bytes and that OFL.txt is the SIL Open Font License 1.1, then parses each font's `name`, `OS/2`
-and `fvar` tables for the family name, PostScript names, weights and italics.
+Downloads come from one commit of google/fonts (PIN below), never from a moving branch. For each family
+in FAMILIES it reads `ofl/<dir>/METADATA.pb`, refuses anything whose licence is not "OFL", downloads the
+static TTFs (Regular, plus Bold / Italic / Bold Italic when the family has them; the variable TTFs for
+variable-only families) and the family's OFL.txt, checks the TrueType/OpenType magic bytes and that
+OFL.txt is the SIL Open Font License 1.1, then parses each font's `name`, `OS/2` and `fvar` tables for
+the family name, PostScript names, weights and italics.
+
+What is downloaded must be what the repository already vouches for: every font's SHA-256 is compared
+with the one recorded in FONTS.json and every OFL.txt with the copy on disk, and a file that differs
+(or that FONTS.json has never seen) stops the run. `--update` is how a maintainer accepts a change on
+purpose: move PIN to a commit you have looked at, run with `--update`, and review the diff of FONTS.json.
+File names come from the remote METADATA.pb, so they are checked before they are used in a path: a
+plain `.ttf` / `.otf` name, no directories.
 
 Writes (paths relative to the repo root):
   ios/Sources/Resources/Fonts/<Family>/*.ttf + OFL.txt     the files the app bundles (folder reference)
@@ -37,7 +46,11 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 FONTS_DIR = os.path.join(REPO, "ios", "Sources", "Resources", "Fonts")
 SWIFT_OUT = os.path.join(REPO, "ios", "PixelClipKit", "Sources", "PixelClipKit", "Text", "BundledFonts.swift")
 PROJECT_YML = os.path.join(REPO, "ios", "project.yml")
-RAW = "https://raw.githubusercontent.com/google/fonts/main/ofl/{dir}/{file}"
+# The google/fonts commit every download comes from (2026-11-14). The 25 bundled fonts and their OFL.txt
+# are byte-identical to this commit's. To take newer fonts: change it to a commit you have reviewed, then
+# run with --update.
+PIN = "cc39c4c2c304bc368c9b7c311ea2bcc6013299fe"
+RAW = "https://raw.githubusercontent.com/google/fonts/" + PIN + "/ofl/{dir}/{file}"
 BUDGET_BYTES = 6 * 1024 * 1024
 
 # (google/fonts directory under ofl/, FontMood case in PixelClipKit, files to leave out)
@@ -271,6 +284,39 @@ def local_name(remote: str) -> str:
     return re.sub(r"\[[^\]]*\]", "-VF", remote).replace("--VF", "-VF")
 
 
+SAFE_REMOTE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_\-]*(\[[A-Za-z0-9,]+\])?\.(ttf|otf)")
+SAFE_LOCAL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_\-]*\.(ttf|otf)")
+
+
+def safe_remote_name(name: object) -> str:
+    """A font file name from the remote METADATA.pb, or SystemExit. It ends up in a URL and (through
+    local_name) in a path on disk, so it must be a bare file name: letters, digits, '-', '_', an optional
+    '[axes]' group and a font extension. No '/', no '\\', no '..', no leading dot."""
+    if not isinstance(name, str) or name != os.path.basename(name) or not SAFE_REMOTE_NAME.fullmatch(name):
+        raise SystemExit("refusing font file name %r from METADATA.pb" % (name,))
+    if not SAFE_LOCAL_NAME.fullmatch(local_name(name)):
+        raise SystemExit("refusing font file name %r (it would be stored as %r)" % (name, local_name(name)))
+    return name
+
+
+def inside(folder: str, name: str) -> str:
+    """os.path.join(folder, name), having checked that it stays inside folder."""
+    path = os.path.realpath(os.path.join(folder, name))
+    if os.path.dirname(path) != os.path.realpath(folder):
+        raise SystemExit("refusing to write %r outside %s" % (name, folder))
+    return path
+
+
+def recorded() -> tuple[dict[str, str], bool]:
+    """({'Family/File.ttf': sha256} from the FONTS.json on disk, whether there is one)."""
+    path = os.path.join(FONTS_DIR, "FONTS.json")
+    if not os.path.exists(path):
+        return {}, False
+    with open(path, encoding="utf-8") as fh:
+        manifest = json.load(fh)
+    return {f["file"]: f["sha256"] for fam in manifest["families"] for f in fam["files"]}, True
+
+
 CT_SWIFT = r"""
 import CoreText
 import Foundation
@@ -346,8 +392,13 @@ def cross_check(families: list[dict]) -> None:
 
 # MARK: main
 
-def build(check_only: bool) -> int:
+def build(check_only: bool, update: bool = False) -> int:
+    if not re.fullmatch(r"[0-9a-f]{40}", PIN):
+        raise SystemExit("PIN must be a full 40-character commit id, not a branch or a tag")
     families, skipped = [], []
+    known, have_manifest = recorded()
+    if not check_only and not update and not have_manifest:
+        raise SystemExit("no FONTS.json to verify downloads against; run with --update to start one")
     staging = tempfile.mkdtemp(prefix="pixelclip-fonts-")
     try:
         for d, mood, excluded in FAMILIES:
@@ -373,6 +424,10 @@ def build(check_only: bool) -> int:
                 log("skip %s: OFL.txt not verified" % d)
                 continue
             remote = [f for f in meta["fonts"] if f.get("filename") not in excluded]
+            for f in remote:
+                safe_remote_name(f.get("filename"))
+            if not remote:
+                raise SystemExit("%s: METADATA.pb lists no font files" % d)
             variable = [f for f in remote if "[" in f["filename"]]
             if variable:
                 chosen = list(dict.fromkeys(f["filename"] for f in variable))
@@ -388,16 +443,29 @@ def build(check_only: bool) -> int:
                 fonts.append((fname, data, Font(data)))  # Font() checks the magic bytes
             family = fonts[0][2].family
             folder = re.sub(r"[^A-Za-z0-9]", "", family)
-            stage = os.path.join(staging, folder)
+            if not folder:
+                raise SystemExit("%s: no usable family name in %s" % (d, fonts[0][0]))
+            # Nothing is accepted that the repository doesn't already vouch for, unless --update says so.
+            if not update:
+                on_disk = os.path.join(FONTS_DIR, folder, "OFL.txt")
+                if not os.path.exists(on_disk) or open(on_disk, "rb").read() != ofl_bytes:
+                    raise SystemExit("%s: the downloaded OFL.txt is not the one on disk (--update accepts it)" % d)
+                for fname, data, _ in fonts:
+                    key = "%s/%s" % (folder, local_name(fname))
+                    got = hashlib.sha256(data).hexdigest()
+                    if known.get(key) != got:
+                        raise SystemExit("%s: SHA-256 %s is not the %s recorded in FONTS.json (--update accepts it)"
+                                         % (key, got, known.get(key) or "one (the file is new)"))
+            stage = inside(staging, folder)
             os.makedirs(stage, exist_ok=True)
-            with open(os.path.join(stage, "OFL.txt"), "wb") as fh:
+            with open(inside(stage, "OFL.txt"), "wb") as fh:
                 fh.write(ofl_bytes)  # byte-for-byte as published
             files, faces = [], []
             for fname, data, font in fonts:
                 if font.family != family:
                     log("warning: %s reports family %r, expected %r" % (fname, font.family, family))
                 ln = local_name(fname)
-                with open(os.path.join(stage, ln), "wb") as fh:
+                with open(inside(stage, ln), "wb") as fh:
                     fh.write(data)
                 files.append({"file": "%s/%s" % (folder, ln), "source": RAW.format(dir=d, file=fname),
                               "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
@@ -419,11 +487,13 @@ def build(check_only: bool) -> int:
         cross_check(families)
         manifest = {"generatedBy": "tools/fonts/fetch_fonts.py",
                     "source": "https://github.com/google/fonts (ofl/)",
+                    "commit": PIN,
                     "license": "SIL Open Font License 1.1 (OFL.txt in each family folder)",
                     "totalBytes": total, "families": families, "skipped": skipped}
         if check_only:
             old = json.load(open(os.path.join(FONTS_DIR, "FONTS.json")))
             manifest["skipped"] = old.get("skipped", [])
+            manifest["commit"] = old.get("commit", PIN)  # where the files on disk came from
         with open(os.path.join(FONTS_DIR, "FONTS.json"), "w", encoding="utf-8") as fh:
             json.dump(manifest, fh, indent=2, ensure_ascii=False)
             fh.write("\n")
@@ -510,4 +580,9 @@ def write_project_yml(manifest: dict) -> None:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--check", action="store_true", help="re-verify files already on disk, no network")
-    sys.exit(build(ap.parse_args().check))
+    ap.add_argument("--update", action="store_true",
+                    help="accept downloads that differ from FONTS.json or are new to it (after moving PIN)")
+    args = ap.parse_args()
+    if args.check and args.update:
+        ap.error("--check reads nothing from the network, so there is nothing to --update")
+    sys.exit(build(args.check, args.update))

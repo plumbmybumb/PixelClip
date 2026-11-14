@@ -13,7 +13,8 @@ trap 'rm -f "$RAW"' EXIT
 code=$(curl -sS -m 30 -o "$RAW" -w '%{http_code}' "$CLIP/screenshot") || { echo "clip not reachable at $CLIP (joined its Wi-Fi?)"; exit 1; }
 size=$(wc -c <"$RAW" | tr -d ' ')
 if [ "$code" != 200 ] || [ "$size" != 257280 ]; then
-    echo "unexpected reply: HTTP $code, $size bytes (want 200, 257280)"; head -c 300 "$RAW"; echo; exit 1
+    # What the clip sent is shown as printable ASCII only (it is data from the network, not text to trust).
+    echo "unexpected reply: HTTP $code, $size bytes (want 200, 257280)"; head -c 300 "$RAW" | LC_ALL=C tr -c '\40-\176' '?'; echo; exit 1
 fi
 python3 "$FW/scripts/rgb565_to_png.py" "$RAW" "$OUT" --scale "${SCALE:-2}"
 echo "$OUT"

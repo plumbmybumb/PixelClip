@@ -1,6 +1,6 @@
 menu "PixelClip display (RM67162 AMOLED)"
 
-    config HAIRCLIP_LCD_PCLK_MHZ
+    config PIXELCLIP_LCD_PCLK_MHZ
         int "AMOLED QSPI clock (MHz)"
         range 10 80
         default 40
@@ -8,7 +8,7 @@ menu "PixelClip display (RM67162 AMOLED)"
             QSPI clock for the RM67162 panel. 40 MHz is what the Waveshare demo uses and is
             verified on this board; 80 MHz roughly halves flush time but is untested.
 
-    config HAIRCLIP_LCD_BOUNCE_ROWS
+    config PIXELCLIP_LCD_BOUNCE_ROWS
         int "Rows per DMA bounce band"
         range 8 60
         default 24
@@ -17,7 +17,7 @@ menu "PixelClip display (RM67162 AMOLED)"
             536 x N x 2 bytes each. Larger bands mean fewer SPI transactions but more internal RAM.
             Odd values are rounded down to even (the panel's window needs even start rows).
 
-    config HAIRCLIP_LCD_EN_GPIO
+    config PIXELCLIP_LCD_EN_GPIO
         int "Display enable GPIO (-1 = none)"
         range -1 48
         default -1
@@ -26,7 +26,7 @@ menu "PixelClip display (RM67162 AMOLED)"
             initialised. -1 (the Waveshare ESP32-S3-AMOLED-1.91 the PixelClip uses) = no such pin.
             LilyGo T-Display-S3 AMOLED V2: 38. The pin is kept driven (also during light sleep).
 
-    config HAIRCLIP_LCD_MADCTL
+    config PIXELCLIP_LCD_MADCTL
         hex "MADCTL (0x36) value for the upright landscape picture"
         range 0x00 0xFF
         default 0xF0

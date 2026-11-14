@@ -153,15 +153,16 @@ enum ClipDocument {
         return p.items.isEmpty && (p.queue ?? []).isEmpty
     }
 
-    /// Something composed differs from what was last sent (from any sender).
-    static func hasUnsentChanges(library: LibraryStore, playlist: PlaylistStore = .shared) -> Bool {
+    /// Something composed differs from what this clip (by its device id; nil: whichever clip was sent to
+    /// last) was last sent, from any sender.
+    static func hasUnsentChanges(library: LibraryStore, playlist: PlaylistStore = .shared, deviceID: String? = nil) -> Bool {
         !isEmpty(library: library, playlist: playlist)
-            && fingerprint(library: library, playlist: playlist) != library.lastSentFingerprint
+            && fingerprint(library: library, playlist: playlist) != library.sentFingerprint(for: deviceID)
     }
 
-    /// Record a successful PUT of the composed document.
-    static func markSent(library: LibraryStore, playlist: PlaylistStore = .shared) {
-        library.markSent(fingerprint: fingerprint(library: library, playlist: playlist))
+    /// Record a successful PUT of the composed document to the clip with this device id.
+    static func markSent(library: LibraryStore, playlist: PlaylistStore = .shared, deviceID: String?) {
+        library.markSent(fingerprint: fingerprint(library: library, playlist: playlist), deviceID: deviceID)
     }
 
     /// The assets a composed playlist needs, as stored on the phone.

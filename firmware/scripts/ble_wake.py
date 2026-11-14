@@ -80,7 +80,10 @@ async def main():
         return 1
     cands.sort(key=lambda c: -c[0])
     rssi, name, dev = cands[0]
-    print(f"found {name} ({dev.address}, RSSI {rssi} dBm)" + (f", {len(cands) - 1} more" if len(cands) > 1 else ""))
+    # What the device says about itself is printed as printable ASCII only (no terminal escapes).
+    shown = lambda s: "".join(c if " " <= c <= "~" else "?" for c in str(s))[:64]
+    name = shown(name)
+    print(f"found {name} ({shown(dev.address)}, RSSI {rssi} dBm)" + (f", {len(cands) - 1} more" if len(cands) > 1 else ""))
 
     notes = []
 
@@ -90,7 +93,7 @@ async def main():
 
     async with BleakClient(dev) as cl:
         info = (await cl.read_gatt_char(INFO)).decode("ascii", "replace")
-        print("info:  ", info, "(device id;fw)")
+        print("info:  ", shown(info), "(device id;fw)")
         print("status:", decode_status(await cl.read_gatt_char(STATUS)))
         if a.status:
             return 0

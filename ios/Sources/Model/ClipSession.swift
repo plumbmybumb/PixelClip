@@ -162,9 +162,17 @@ final class ClipSession {
         links.onJoined = { [weak self] in self?.joinedWiFi() }
         links.onRoute = { [weak self] r in
             self?.lastRoute = r
-            sendLog("\(r.route.method) \(r.route.path) over \(r.transport == .bluetooth ? "Bluetooth" : "Wi‑Fi")\(r.fellBack ? " (Bluetooth failed first)" : "") · \(String(format: "%.2f", r.seconds)) s")
+            let (kind, id) = AppLog.routeParts(r.route)
+            sendLog(kind, peer: id, then: " over \(r.transport == .bluetooth ? "Bluetooth" : "Wi‑Fi")\(r.fellBack ? " (Bluetooth failed first)" : "") · \(String(format: "%.2f", r.seconds)) s")
         }
-        doorbell.onLog = { sendLog($0) }
+        doorbell.onLog = { line in
+            // The two lines that carry the name a peripheral advertises ("heard PixelClip-1A2B (−58 dBm)").
+            for verb in ["bluetooth: heard ", "bluetooth: found "] where line.hasPrefix(verb) {
+                sendLog(verb, peer: String(line.dropFirst(verb.count)))
+                return
+            }
+            sendLog(line)
+        }
     }
 
     var state: HotspotState { joiner.state }
@@ -174,7 +182,8 @@ final class ClipSession {
     /// The clip's screen keeps playing during a session (PROTOCOL §3), so brightness, Next and Show
     /// Now apply live. False only when the clip reports the panel-off mode.
     var screenStaysOn: Bool { config?.screenStaysOn ?? true }
-    var displayName: String { config?.name ?? status?.device.name ?? "PixelClip" }
+    /// The clip's name as it says it (tidied: it is the clip's text, not the app's).
+    var displayName: String { AppLog.tidy(config?.name ?? status?.device.name ?? "PixelClip") }
     var ssid: String { status?.ssid ?? "\(HotspotDefaults.ssidPrefix)…" }
 
     // MARK: Connection
@@ -335,7 +344,7 @@ final class ClipSession {
         await doorbell.peek()
         lastLookAt = Date()
         if let n = nearby {
-            sendLog("look: near · \(n.name)\(n.linked ? " · linked" : "")\(n.status.map { " · \($0.percent)%" } ?? "")")
+            sendLog("look: near · ", peer: n.name, then: "\(n.linked ? " · linked" : "")\(n.status.map { " · \($0.percent)%" } ?? "")")
         } else {
             sendLog("look: not near")
         }
@@ -642,7 +651,7 @@ final class ClipSession {
 
     private func handle(_ error: any Error) {
         let p = SendProblem(error: error, batteryWasLow: batteryWasLow)
-        sendLog("clip error: \(error.localizedDescription) → \(p.title)")
+        sendLog("clip error: ", peer: error.localizedDescription, then: " → \(p.title)")
         if p == .clipNotAnswering || p == .lowBatteryEndedSession { joiner.markDisconnected() }
         problem = p
     }

@@ -2,7 +2,7 @@
  *
  * The radio is off outside a session: net_session_start() creates the netif and initialises the WiFi
  * driver (first session only, see below), starts a WPA2 SoftAP ("PixelClip-XXXX", channel 6, 1 station, TX
- * capped at CONFIG_HAIRCLIP_WIFI_MAX_TX_DBM on USB / _BATTERY on battery, 802.11g/n HT20 only), mDNS
+ * capped at CONFIG_PIXELCLIP_WIFI_MAX_TX_DBM on USB / _BATTERY on battery, 802.11g/n HT20 only), mDNS
  * "pixelclip.local" and the HTTP API on port 80. net_session_stop() stops the HTTP server, mDNS and the radio
  * (esp_wifi_stop + WIFI_MODE_NULL). The driver itself stays initialised while the BLE doorbell runs:
  * esp_wifi_deinit() with NimBLE + coexistence active is avoided (README "Light sleep on battery"); it is

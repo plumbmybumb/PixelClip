@@ -87,6 +87,15 @@ void health_wdt_stop(void);
  * count it in NVS. Returns the reason name. */
 const char *health_boot_record(void);
 
+/* Safe start (valid after health_boot_record()): true when this boot follows three crashes in a row (panic or
+ * any watchdog reset) that each ended a run whose last sign of life was less than 120 s after its boot. The
+ * caller (app_main) then starts without the stored playlist, so that stored content which crashes the clip at
+ * every boot cannot make it unreachable: the hotspot and the BLE doorbell still come up and the owner sends
+ * the playlist again. It never triggers on ordinary resets (power-on, the RESET key, a USB or flashing reset,
+ * the restart after an OTA, a deep-sleep wake, a brownout): each of them, and any crash of a run that lived
+ * longer, ends the streak. The streak lives in RTC memory, so a power loss ends it as well. */
+bool health_safe_start(void);
+
 /* Reason of this boot, e.g. "RTCWDT_SYS" (valid after health_boot_record()). */
 const char *health_reset_name(void);
 void health_get_resets(health_resets_t *out);

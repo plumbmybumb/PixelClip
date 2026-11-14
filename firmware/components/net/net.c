@@ -8,6 +8,7 @@
 #include "net_priv.h"
 
 #include <string.h>
+#include <strings.h>
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -260,7 +261,7 @@ static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
 /* TX cap for the running session: lower on battery (peak current under TX sags the 500 mAh cell). */
 static int tx_cap_dbm(void)
 {
-    return power_on_battery() ? CONFIG_HAIRCLIP_WIFI_MAX_TX_DBM_BATTERY : CONFIG_HAIRCLIP_WIFI_MAX_TX_DBM;
+    return power_on_battery() ? CONFIG_PIXELCLIP_WIFI_MAX_TX_DBM_BATTERY : CONFIG_PIXELCLIP_WIFI_MAX_TX_DBM;
 }
 
 static void apply_tx_power(void)
@@ -329,7 +330,27 @@ void net_wifi_release_if_idle(void)
     xSemaphoreGive(s_wifi_lock);
 }
 
-static esp_err_t start_wifi(const appcfg_t *cfg)
+/* Overwrite a buffer that held the passphrase (volatile: the compiler must not drop a "dead" store). */
+static void wipe(void *p, size_t n)
+{
+    volatile uint8_t *b = p;
+    while (n--) *b++ = 0;
+}
+
+bool net_host_allowed(const char *host)
+{
+    char ip[16] = "192.168.4.1";   /* the SoftAP default, should the lookup fail */
+    esp_netif_ip_info_t info;
+    if (s_netif && esp_netif_get_ip_info(s_netif, &info) == ESP_OK && info.ip.addr != 0) {
+        esp_ip4addr_ntoa(&info.ip, ip, sizeof ip);
+    }
+    size_t n = strlen(host);
+    if (n > 3 && strcmp(host + n - 3, ":80") == 0) n -= 3;
+    static const char name[] = HOSTNAME ".local";
+    return (n == strlen(ip) && memcmp(host, ip, n) == 0) || (n == sizeof name - 1 && strncasecmp(host, name, n) == 0);
+}
+
+static esp_err_t start_wifi(void)
 {
     xSemaphoreTake(s_wifi_lock, portMAX_DELAY);
     esp_err_t err = wifi_driver_init();
@@ -339,7 +360,7 @@ static esp_err_t start_wifi(const appcfg_t *cfg)
 
     wifi_config_t ap = {
         .ap = {
-            .channel = CONFIG_HAIRCLIP_WIFI_CHANNEL,
+            .channel = CONFIG_PIXELCLIP_WIFI_CHANNEL,
             .max_connection = 1,
             .authmode = WIFI_AUTH_WPA2_PSK,
             .pmf_cfg = { .required = false },
@@ -348,8 +369,13 @@ static esp_err_t start_wifi(const appcfg_t *cfg)
     };
     strlcpy((char *)ap.ap.ssid, s_ssid, sizeof ap.ap.ssid);
     ap.ap.ssid_len = (uint8_t)strlen(s_ssid);
-    strlcpy((char *)ap.ap.password, cfg->ap_password, sizeof ap.ap.password);
-    ESP_RETURN_ON_ERROR(esp_wifi_set_config(WIFI_IF_AP, &ap), TAG, "ap config");
+    /* The passphrase goes from appcfg's static storage straight into the driver's config and is wiped from
+     * this frame at once: the controller's stack is in every core dump (security audit WIFI-10). */
+    _Static_assert(sizeof ap.ap.password >= APPCFG_AP_PASSWORD_MAX, "passphrase buffer");
+    appcfg_get_ap_password((char *)ap.ap.password, sizeof ap.ap.password);
+    err = esp_wifi_set_config(WIFI_IF_AP, &ap);
+    wipe(ap.ap.password, sizeof ap.ap.password);
+    ESP_RETURN_ON_ERROR(err, TAG, "ap config");
     ESP_RETURN_ON_ERROR(esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N), TAG, "protocol"); // 11B is mandatory in the mask (ESP_ERR_INVALID_ARG otherwise); the AP still negotiates g/n with modern phones
     ESP_RETURN_ON_ERROR(esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20), TAG, "bandwidth");
     ESP_RETURN_ON_ERROR(esp_wifi_start(), TAG, "wifi start");
@@ -358,7 +384,7 @@ static esp_err_t start_wifi(const appcfg_t *cfg)
     ESP_RETURN_ON_ERROR(esp_wifi_set_max_tx_power((int8_t)(dbm * 4)), TAG, "tx power");
     int8_t pwr = 0;
     if (esp_wifi_get_max_tx_power(&pwr) == ESP_OK) {
-        ESP_LOGI(TAG, "SoftAP %s up on ch %d, TX cap %.2f dBm (%s)", s_ssid, CONFIG_HAIRCLIP_WIFI_CHANNEL, pwr / 4.0,
+        ESP_LOGI(TAG, "SoftAP %s up on ch %d, TX cap %.2f dBm (%s)", s_ssid, CONFIG_PIXELCLIP_WIFI_CHANNEL, pwr / 4.0,
                  power_on_battery() ? "battery" : "USB");
     }
     return ESP_OK;
@@ -380,10 +406,15 @@ static esp_err_t start_httpd(void)
     hc.max_uri_handlers = 48;    /* 44 routes registered (http_api.c) */
     hc.max_open_sockets = 4;
     hc.lru_purge_enable = true;
-    hc.recv_wait_timeout = 10;     /* per recv; handlers retry HTTPD_SOCK_ERR_TIMEOUT up to 3x */
-    hc.send_wait_timeout = 10;
+    /* Slow clients (security audit WIFI-8, http_api.c "slow-client guard"): every blocking socket call returns
+     * within HTTP_SOCK_TIMEOUT_S, so the httpd task checks in with the liveness watchdog, and notices a session
+     * end, at least that often. How long a quiet client is waited for is decided there, not here. */
+    hc.recv_wait_timeout = HTTP_SOCK_TIMEOUT_S;
+    hc.send_wait_timeout = HTTP_SOCK_TIMEOUT_S;
+    hc.open_fn = http_api_on_open;
     hc.max_resp_headers = 8;
     hc.uri_match_fn = httpd_uri_match_wildcard;
+    http_api_stopping(false);
     ESP_RETURN_ON_ERROR(httpd_start(&s_httpd, &hc), TAG, "httpd start");
     return http_api_register(s_httpd);
 }
@@ -414,7 +445,7 @@ esp_err_t net_session_start(const net_session_opts_t *opts)
     s_uploads = 0;
     power_session(true);
     s_active = true;
-    esp_err_t err = start_wifi(&cfg);
+    esp_err_t err = start_wifi();
     if (err == ESP_OK) err = start_mdns(&cfg);
     if (err == ESP_OK) err = start_httpd();
     if (err != ESP_OK) {
@@ -457,6 +488,10 @@ void net_session_stop(void)
         TaskHandle_t t = xTaskGetHandle("httpd");
         if (t) ESP_LOGI(TAG, "httpd stack high-water: %u B free of %u", (unsigned)uxTaskGetStackHighWaterMark(t),
                         (unsigned)HTTPD_STACK);
+        /* A request in flight (a stalled upload, a client that stopped reading) gives up at its next socket call,
+         * at most HTTP_SOCK_TIMEOUT_S away, instead of holding httpd_stop(), and with it this task, which feeds
+         * the RTC watchdog, until the client is done (security audit WIFI-8). */
+        http_api_stopping(true);
         esp_err_t err = httpd_stop(s_httpd);
         if (err != ESP_OK) ESP_LOGE(TAG, "httpd_stop: %s", esp_err_to_name(err));
         s_httpd = NULL;

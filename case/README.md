@@ -155,7 +155,8 @@ Fusion user parameter. To use it:
    Key A and Key B.
 3. Change parameters under *Modify > Change Parameters*, then run `build(des)` again to regenerate.
 
-Checked: run as published in a new Fusion design, it reproduces the released parts. The keys come out with
+Checked by the project when the parts were released (not independently repeated): run as published in a new
+Fusion design, it reproduces the released parts. The keys come out with
 identical volumes, the tray B-rep volume is within 0.04 %, and meshes of the regenerated tray and lid are within
 0.02 % of the released meshes' volume and within 0.015 mm of their surfaces.
 
@@ -165,3 +166,13 @@ From the STEP solids in Fusion (custom mesh refinement: surface deviation 0.003 
 the tray, 0.002 mm and 2° for the lid and keys), then rotated into print orientation and set on Z = 0. Each mesh
 was checked against a much finer mesh of the same solid: closed and manifold, volume within 0.025 %, surface
 within 0.012 mm.
+
+## Licence and no warranty
+
+The case files in this folder (the STL and STEP files, the generator script in `source/` and the renders) are
+released under the project's [MIT licence](../LICENSE), like the rest of PixelClip.
+
+They come with **no warranty of any kind**, including fitness for a purpose and safety. In particular, nothing here
+promises that a printed case will protect or safely hold a lithium cell, survive a drop, or stay closed in use;
+see "Known limits" above and the safety notes in [`../docs/BUILD.md`](../docs/BUILD.md#safety). You print, assemble
+and wear it at your own risk.

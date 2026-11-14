@@ -46,7 +46,7 @@ static const char *TAG = "player";
 #define PLAYER_TASK_PRIO  4
 #define STILL_DEFAULT_MS  5000
 #define FRAME_DEFAULT_MS  100
-#define SCRATCH_MAX       (DISPLAY_FB_BYTES + 4096)
+#define SCRATCH_MAX       (DISPLAY_FB_BYTES * 2)   /* PROTOCOL §2: an RLE16 frame is at most 4 bytes per pixel */
 #define SCHED_TICK_US     1000000
 #define SCENE_FRAME_US    33333  /* 30 fps target (>= 25 fps required) */
 #define SCENE_MIN_GAP_US  2000   /* always block a little between frames (idle task / TWDT) */
@@ -623,8 +623,10 @@ static bool asset_open(const char *id)
     if (fd < 0) return false;
     size_t tbytes = hca_table_bytes(info.frames);
     uint8_t *table = heap_caps_malloc(tbytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!table || !read_exact(fd, 0, table, tbytes) || hca_open(&s_cur.asset, table, tbytes) != HCA_OK) {
+    if (!table || !read_exact(fd, 0, table, tbytes) || hca_open(&s_cur.asset, table, tbytes) != HCA_OK ||
+        s_cur.asset.hdr.width != DISPLAY_W || s_cur.asset.hdr.height != DISPLAY_H) {   /* asset_decode: the framebuffer */
         ESP_LOGW(TAG, "cannot open asset %s", id);
+        memset(&s_cur.asset, 0, sizeof s_cur.asset);
         free(table);
         close(fd);
         return false;
@@ -1178,8 +1180,11 @@ static void or_deck_cache(void)
         vTaskDelay(1);
     }
     if (fd >= 0) close(fd);
-    ok = ok && hca_open(&s_or.deck_full, mem, info.size) == HCA_OK &&
-         s_or.deck_full.hdr.frame_count == s_or.f[OR_ASSET_DECK].a.hdr.frame_count;
+    /* the same deck as the one or_file_load saw: an upload may have replaced the file since (its reload is still in
+     * the queue), and or_paint_op checks an op against the table's geometry */
+    const hca_header_t *th = &s_or.f[OR_ASSET_DECK].a.hdr;
+    ok = ok && hca_open(&s_or.deck_full, mem, info.size) == HCA_OK && s_or.deck_full.hdr.frame_count == th->frame_count &&
+         s_or.deck_full.hdr.width == th->width && s_or.deck_full.hdr.height == th->height;
     if (!ok) {
         ESP_LOGW(TAG, "oracle %s: deck %s could not be cached: frames streamed", s_cur.item.id, id);
         free(mem);
@@ -1519,6 +1524,7 @@ static bool or_paint_op(const or_op_t *op)
     const uint16_t w = f->a.hdr.width, h = f->a.hdr.height;
     if (op->x < 0 || op->y < 0 || op->x + w > DISPLAY_W || op->y + h > DISPLAY_H) return false;
     if (op->asset == OR_ASSET_DECK && s_or.deck_mem) {   /* the deck cache: decode only */
+        if (s_or.deck_full.hdr.width != w || s_or.deck_full.hdr.height != h) return false;   /* (never: or_deck_cache) */
         const hca_status_t hs = hca_decode_frame(&s_or.deck_full, op->frame, display_fb() + (size_t)op->y * DISPLAY_W + op->x,
                                                  DISPLAY_W);
         if (hs != HCA_OK) ESP_LOGE(TAG, "oracle %s: cached deck frame %u: %s", s_cur.item.id, op->frame, hca_status_str(hs));
@@ -2504,6 +2510,7 @@ static bool content_available(const pl_item_t *it)
 #if PL_SCENES
     case PL_ITEM_SCENE: return scene_find(it->id) != NULL;
 #endif
+    case PL_ITEM_BOARD: return storage_asset_find(it->id, NULL);   /* §5g: board_begin checks the sheet */
     default: return false;
     }
 }

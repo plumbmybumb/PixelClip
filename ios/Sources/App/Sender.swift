@@ -90,7 +90,7 @@ final class Sender {
     let session: ClipSession
     let library: LibraryStore
     let router: Router
-    static let log = Logger(subsystem: "com.example.pixelclip", category: "send")
+    static let log = Logger(subsystem: AppLog.subsystem, category: "send")
 
     init(session: ClipSession, library: LibraryStore, router: Router) {
         self.session = session
@@ -180,7 +180,7 @@ final class Sender {
                 try await session.client.next()
                 sendLog("sender: playlist on · the clip stepped to the next entry")
             } catch {
-                sendLog("sender: playlist on · couldn’t step the clip (\(error.localizedDescription)); it moves on by itself")
+                sendLog("sender: playlist on · couldn’t step the clip (", peer: error.localizedDescription, then: "); it moves on by itself")
             }
         }
         isSending = false

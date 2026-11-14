@@ -64,8 +64,31 @@ struct PickedMovie: Transferable {
 }
 
 enum MediaImporter {
+    /// Working copies of movies being cropped live in `tmp` as `import-…`; they are deleted when the crop
+    /// screen closes (`Router`) and, for whatever a crash left, when the app starts.
+    static let tempPrefix = "import-"
+
     static func tempURL(ext: String) -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent("import-\(UUID().uuidString).\(ext)")
+        FileManager.default.temporaryDirectory.appendingPathComponent("\(tempPrefix)\(UUID().uuidString).\(ext)")
+    }
+
+    static func isTemporaryCopy(_ url: URL) -> Bool {
+        url.lastPathComponent.hasPrefix(tempPrefix)
+            && url.deletingLastPathComponent().standardizedFileURL.path == FileManager.default.temporaryDirectory.standardizedFileURL.path
+    }
+
+    /// Deletes a working copy (and nothing else).
+    static func discardTemporaryCopy(_ url: URL) {
+        if isTemporaryCopy(url) { try? FileManager.default.removeItem(at: url) }
+    }
+
+    /// At launch: no crop screen is open, so every working copy is a leftover.
+    static func sweepTemporaryCopies() {
+        let tmp = FileManager.default.temporaryDirectory
+        for file in (try? FileManager.default.contentsOfDirectory(at: tmp, includingPropertiesForKeys: nil)) ?? []
+        where file.lastPathComponent.hasPrefix(tempPrefix) {
+            try? FileManager.default.removeItem(at: file)
+        }
     }
 
     // MARK: Photos
@@ -103,15 +126,22 @@ enum MediaImporter {
 
     // MARK: Files
 
-    static func load(fileURL url: URL) async throws -> ImportedMedia {
+    /// - Parameter consuming: the file is the app's own to use up (a shared item from the inbox): a movie
+    ///   is moved to its working place rather than copied.
+    static func load(fileURL url: URL, consuming: Bool = false) async throws -> ImportedMedia {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         let type = UTType(filenameExtension: url.pathExtension) ?? .data
         let name = url.deletingPathExtension().lastPathComponent
         if type.conforms(to: .movie) {
             let dest = tempURL(ext: url.pathExtension)
-            try FileManager.default.copyItem(at: url, to: dest)
-            return try await fromMovie(dest, kind: .file, name: name)
+            if consuming, (try? FileManager.default.moveItem(at: url, to: dest)) != nil {} else {
+                try FileManager.default.copyItem(at: url, to: dest)
+            }
+            do { return try await fromMovie(dest, kind: .file, name: name) } catch {
+                discardTemporaryCopy(dest)
+                throw error
+            }
         }
         guard type.conforms(to: .image) else { throw ImportError.unsupported }
         let data = try Data(contentsOf: url)

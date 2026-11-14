@@ -14,6 +14,8 @@ final class ShareModel {
 
     var phase: Phase = .loading
     var media: Media?
+    /// A small preview of the shared picture (made off the main thread at thumbnail size).
+    var thumbnail: UIImage?
     var title = ""
     var text: String?
     var url: URL?
@@ -79,15 +81,18 @@ struct ShareSheetView: View {
         VStack(alignment: .leading, spacing: 18) {
             ZStack {
                 RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.black)
-                if !media.isVideo, let image = UIImage(contentsOfFile: media.url.path) {
+                if !media.isVideo, let image = model.thumbnail {
                     Image(uiImage: image).resizable().scaledToFill()
                 } else {
-                    Image(systemName: "film").font(.largeTitle).foregroundStyle(Color.shareAccentOnBlack)
+                    Image(systemName: media.isVideo ? "film" : "photo").font(.largeTitle).foregroundStyle(Color.shareAccentOnBlack)
                 }
             }
             .aspectRatio(536.0 / 240.0, contentMode: .fit)
             .clipShape(.rect(cornerRadius: 14, style: .continuous))
             .accessibilityLabel(media.isVideo ? "The shared video" : "The shared photo")
+            if case .failed(let message) = model.phase {
+                Label(message, systemImage: "exclamationmark.triangle.fill").font(.subheadline).foregroundStyle(.orange)
+            }
             Spacer(minLength: 0)
             saveButton(title: "Send to PixelClip", systemImage: "paperplane.fill")
             Text("Open PixelClip: it’s waiting in Send, ready to fit into the clip’s frame.")

@@ -8,7 +8,9 @@ of truth, one `./build.sh` drives everything, one navigation stack (Home at the 
 ```
 ios/
   project.yml          XcodeGen spec (never hand-edit PixelClip.xcodeproj — it's generated and git-ignored)
-  build.sh             build · run · test · device
+  Config.xcconfig      who built it: team, bundle id prefix, App Group (placeholders; includes your Local.xcconfig)
+  Local.xcconfig.example   copy to Local.xcconfig (git-ignored) to build for an iPhone
+  build.sh             build · run · test · device · device-release
   Sources/             the app: App/ (entry, router, demo content), Model/, Views/, Resources/, assets
   PixelClipKit/             local Swift package, no UIKit: .hca codec (incl. scrolling strips), colour pipeline,
                        protocol models, HTTP + virtual clients, sync engine, playlist composer, Bluetooth
@@ -23,17 +25,26 @@ ios/
 ## Build, run, test
 
 ```sh
-brew install xcodegen          # once
+brew install xcodegen          # once (2.45 is what this was last built with)
 ./build.sh                     # xcodegen + Debug build for the simulator
 ./build.sh run                 # …then install + launch; extra args go to the app (see Debug launch arguments)
 ./build.sh test                # swift test (macOS, incl. C-decoder parity) + xcodebuild test (simulator)
-DEVICE_ID=<udid> ./build.sh device   # build, install and launch on an iPhone (USB or same Wi‑Fi)
+DEVICE_ID=<udid> ./build.sh device           # Debug build, installed and launched on an iPhone (USB or same Wi‑Fi)
+DEVICE_ID=<udid> ./build.sh device-release   # the same with a Release build: the one to wear
 ```
 
 Choose the simulator with `SIM_NAME="iPhone 17 Pro" ./build.sh run` or `SIM_UDID=… ./build.sh run`
-(`xcrun simctl list devices` lists them). `./build.sh device` needs `DEVICE_ID` (from
-`xcrun devicectl list devices`) and a signing team (see Bundle id and signing). Only actionable lines are
-printed; the full log is `build/last-build.log`.
+(`xcrun simctl list devices` lists them). The two device commands need `DEVICE_ID` (from
+`xcrun devicectl list devices`) and your signing team and bundle id prefix in `Local.xcconfig` (see Bundle id
+and signing). Only actionable lines are printed; the full log is `build/last-build.log`.
+
+**Debug or Release on the phone.** `device` installs a Debug build: Settings ▸ Advanced has a Debug section
+(the virtual clip, which makes every send go to an in-memory clip while the app says "Sent"), the `-PixelClip…`
+launch arguments work, and each send prints its playlist to the console and writes it to
+`Caches/last-sent-playlist.json`. That is the build for working on the app. `device-release` installs the
+Release configuration, where none of that exists (it is compiled out, and the app always talks to the real
+clip): the build to wear and to hand to someone else. An archive for TestFlight or the App Store is also
+Release (the scheme's Archive action).
 
 `./build.sh test` also runs the `PixelClipUITests` smoke check (`HomeSmokeTests`, see The app ▸ UI test). It builds `../core` with CMake if `../build/core/tools/hcainfo` is missing, so the
 parity tests can run `hcaenc`/`hcainfo` against Swift output (they skip themselves if the tools
@@ -135,8 +146,10 @@ first in the rotation, so the switch alone would leave what's on the clip there 
 (and every off/on starts that minute over): `Sender.turnPlaylist(on:)` follows a successful send with
 `POST /next` when the rotation has a second entry, so turning the playlist on shows something new at once.
 
-**Send log** (Settings ▸ Advanced ▸ Send log, `Model/SendLog.swift`, also the unified log, category
-`sendlog`): one line per step — the toggle, the request (or "queued behind the running send"), every
+**Send log** (Settings ▸ Advanced ▸ Send log, `Model/SendLog.swift`, also the unified log, subsystem = the app's
+bundle id, category `sendlog`; there the app's own words are public and what the clip said or the user named,
+such as the clip's name, what it reports on screen, its error text or a picture's id, is private, a hash in
+Console): one line per step — the toggle, the request (or "queued behind the running send"), every
 Bluetooth look ("heard PixelClip-1A2B (−58 dBm)", "not heard (look scan timed out)", "found … already connected
 to this iPhone (not advertising): using that link", "the link doesn't answer: dropping it and scanning"),
 the fast lane or the doorbell ("writing the wake", "wake accepted"), the join, every request with its route
@@ -328,12 +341,15 @@ status line, the Sender's toasts and the playlist.
   "wake 0.02 s · join 0.09 s · connect 0.19 s · upload 0.07 s · total 0.37 s (end 0.29 s after)" under
   the steps in Debug builds (and in the "Done" toast), and every build logs it with `Logger`
   (subsystem = the app's bundle id, category `send`; Console.app on a device build). What makes it shorter:
-  - **A remembered network.** `NEHotspotConfiguration` is installed with `joinOnce = false`, so iOS asks
-    to join `PixelClip-…` only the first time. If the system refuses a remembered configuration
-    (`HotspotJoinError.refused`: system configuration / invalid / unknown), the joiner falls back to
-    join-once at once and stays join-once for the app's life. Settings ▸ Advanced ▸ **Forget Clip**
-    removes it (`NEHotspotConfigurationManager.removeConfiguration` for every configured `PixelClip-…` SSID
-    and the prefix) and the clock records.
+  - **A remembered network, not join-once.** `NEHotspotConfiguration` is installed with `joinOnce = false`,
+    so iOS asks to join `PixelClip-…` only the first time, keeps the network in its list of known networks
+    afterwards, and can use it again without asking. (`docs/PROTOCOL.md` describes the phone's side as
+    "join-once"; in this app that is only the fallback.) If the system refuses a remembered configuration
+    (`HotspotJoinError.refused`: system configuration / invalid / unknown / join-once not supported), the
+    joiner falls back to join-once at once and stays join-once until the app is relaunched or the network is
+    forgotten. Settings ▸ Advanced ▸ **Forget the clip’s Wi‑Fi** removes the remembered network
+    (`NEHotspotConfigurationManager.removeConfiguration` for every configured `PixelClip-…` SSID and the
+    prefix) and the clock records.
   - **Bluetooth reuse and overlap** (see the doorbell above): the Nearby link is reused, the scan exits on
     the first match, the probe runs alongside the ring and the join starts at the acknowledged write.
   - **No-ops skipped** (`SendSkipRules`, PixelClipKit/Sync): `POST /time` only when the first `/status` says
@@ -470,9 +486,9 @@ status line, the Sender's toasts and the playlist.
 - **Reader (PROTOCOL §5c).** Library ▸ Add ▸ Read… lists saved texts (`ReaderStore`, Application
   Support/Reader): paste, Files (.txt/.md/.epub), a link (`TextImporter`: Markdown stripping, EPUB spine +
   nav/NCX chapters through a small ZIP reader, readability-style article extraction from HTML), or the
-  **PixelClipShare** extension (Safari/Notes ▸ Share ▸ PixelClip; it writes JSON into the App Group
-  `group.com.example.pixelclip` inbox, Safari's preprocessing JS adds the page HTML; the app imports on
-  becoming active). `RSVPText`/`RSVPTiming` are line-for-line ports of `core/src/rsvp_tok.c` (word index,
+  **PixelClipShare** extension (Safari/Notes ▸ Share ▸ PixelClip; it writes JSON into the App Group's
+  inbox, Safari's preprocessing JS adds the page HTML; the app imports on becoming active; see
+  [Shared content](#shared-content-limits-and-what-is-kept) for how that is kept safe). `RSVPText`/`RSVPTiming` are line-for-line ports of `core/src/rsvp_tok.c` (word index,
   title break, §5c factors, Spritz ORP), `ReaderPreview` of `rsvp_paint.c` (layout, ticks, pause mark,
   "fin" card). `ReaderFontRenderer` renders any catalogue typeface into four glyph atlases
   (`reader-font-<hash>-{n,na,c,ca}`, 210 glyphs; normal = largest size where a 12-glyph word fits with
@@ -558,26 +574,33 @@ Still different or unverified:
 
 ## Device: the real clip
 
-1. `DEVICE_ID=<udid> ./build.sh device` with your team set (see Bundle id and signing; first time: Xcode may need
-   to register the device and add the Hotspot Configuration capability to the App ID — `-allowProvisioningUpdates`
-   does it).
+1. `DEVICE_ID=<udid> ./build.sh device-release` (or `device` for a Debug build) with your team and bundle id
+   prefix in `Local.xcconfig` (see Bundle id and signing; first time: Xcode may need to register the device and
+   add the Hotspot Configuration capability to the App ID — `-allowProvisioningUpdates` does it, in your Apple
+   account).
 2. In the app, just Send. The first time iOS asks for Bluetooth; small sends go over the Bluetooth fast
    lane, and new pictures wake the clip's Wi‑Fi (it shows “WiFi: PixelClip-XXXX” and starts its SoftAP), iOS
-   asks to join “PixelClip-…” (the first time only: the network is remembered), and the app talks HTTP to
+   asks to join “PixelClip-…” (the first time only: the network is remembered, see "A remembered network" above), and the app talks HTTP to
    `192.168.4.1`. The toast says "Sent" and the app ends the session in the background.
 3. Without Bluetooth (off, not allowed, or no answer within 8 s) hold BOOT ≥ 1.5 s first, as before.
 
-The virtual-clip toggle defaults to off on a device (and doesn't exist in Release). The hotspot
+The virtual-clip toggle defaults to off on a device, and doesn't exist in a Release build
+(`./build.sh device-release`; `./build.sh device` installs a Debug build, which has it). The hotspot
 password the app uses lives in Settings ▸ Advanced (default `pixelclip-2026`).
 
 **Entitlements / Info.plist** (all in `project.yml`):
 - `com.apple.developer.networking.HotspotConfiguration` — `NEHotspotConfiguration` by SSID prefix
-  `PixelClip-`, remembered (`joinOnce = false`; join-once if refused). This entitlement needs a **paid developer team** (see Bundle id and signing).
+  `PixelClip-`, remembered (`joinOnce = false`; join-once only if iOS refuses that). This entitlement needs a **paid developer team** (see Bundle id and signing).
+- `com.apple.security.application-groups` — the one App Group (`$(APP_GROUP_ID)`) the app and the Share
+  Extension hand shared items over in.
 - `NSLocalNetworkUsageDescription` and ATS `NSAllowsLocalNetworking` (the clip speaks plain HTTP on
   its own WPA2 network; IP-literal hosts are outside ATS anyway).
-- `NSPhotoLibraryUsageDescription` (live-photo video from the picker) and
-  `NSPhotoLibraryAddUsageDescription` (Save Image from a screenshot's share sheet).
-- `NSBluetoothAlwaysUsageDescription` (the doorbell). Scanning for the Clip tab stays foreground only.
+- `NSPhotoLibraryUsageDescription` (live-photo video from the picker). There is no
+  `NSPhotoLibraryAddUsageDescription`: nothing in the app saves to Photos.
+- `NSBluetoothAlwaysUsageDescription` ("…to find and wake your clip and to send it small updates": the
+  doorbell and the fast lane, which carries settings, the playlist and the clock). Scanning stays foreground only.
+- `PixelClipAppGroup` — the App Group's name for the code (`AppGroup.identifier`), from the same build setting
+  as the entitlement.
 - No background modes: the app drops its Bluetooth link when it goes to the background and does nothing there.
 - French translations of all of them in `Sources/Resources/fr.lproj/InfoPlist.strings` (English in
   `en.lproj`, keep them in step with `project.yml`). Joining the hotspot and notifications have no
@@ -589,8 +612,9 @@ password the app uses lives in Settings ▸ Advanced (default `pixelclip-2026`).
   upside-down somewhere the archive still warns "All interface orientations must be supported unless
   the app requires full screen" (`UIRequiresFullScreen` is deprecated in iOS 26), and it never
   applies to an iPhone-only app.
-- `PrivacyInfo.xcprivacy`: no tracking or collection; UserDefaults (CA92.1) and file timestamps
-  (C617.1, Discover's cache trims its own files by modification date).
+- `PrivacyInfo.xcprivacy`: no tracking or collection; one required-reason API, UserDefaults (CA92.1, the
+  app's own settings). Nothing reads file timestamps, disk space, the boot time or the keyboard list (the
+  inboxes are ordered by file name). The Share Extension uses none of them and has no manifest.
 
 ## Landscape (Draw)
 
@@ -624,26 +648,98 @@ The app is portrait except Draw, which may turn sideways.
 
 ## Bundle id and signing
 
-Everything is set in `ios/project.yml` (XcodeGen regenerates the Xcode project from it on every `./build.sh`):
+The identifiers that say who built the app are build settings in **one place**, `ios/Config.xcconfig`:
 
-- `options.bundleIdPrefix` is `com.example`; the targets' `PRODUCT_BUNDLE_IDENTIFIER`s are `com.example.pixelclip` (the
-  app), `com.example.pixelclip.share` (the share extension) and `com.example.pixelclip.uitests`. Change all of them to a
-  prefix you own before building for a device. `build.sh`'s `device` command launches the app by its bundle id, so
-  keep the one in `build.sh` in step.
-- The app and the share extension share the App Group `group.com.example.pixelclip` (the `MediaInbox` /
-  `ReaderInbox` hand-over); change it everywhere it is named: both targets' entitlements in `project.yml`,
-  `Sources/PixelClip.entitlements`, `ShareExtension/PixelClipShare.entitlements` and the code (search for
-  `group.com.example.pixelclip`).
-- `DEVELOPMENT_TEAM` is empty: set your own team id in the `settings.base` block (or in Xcode for a local
-  build). Simulator builds and `./build.sh test` don't need a team.
+| Setting | Placeholder | Becomes |
+|---|---|---|
+| `DEVELOPMENT_TEAM` | empty | the signing team |
+| `BUNDLE_ID_PREFIX` | `com.example` | the bundle ids `<prefix>.pixelclip` (the app), `<prefix>.pixelclip.share` (the share extension), `<prefix>.pixelclip.uitests` |
+| `APP_GROUP_ID` | `group.$(BUNDLE_ID_PREFIX).pixelclip` | the App Group in both targets' entitlements, and (through the `PixelClipAppGroup` Info.plist key) the one the code opens for the `MediaInbox` / `ReaderInbox` hand-over |
+
+With the placeholders the simulator build, `./build.sh run` and `./build.sh test` need no setup and no team.
+
+**To build for an iPhone, don't edit a tracked file.** Copy `Local.xcconfig.example` to `Local.xcconfig` and
+set your team id and a bundle id prefix you own:
+
+```
+DEVELOPMENT_TEAM = ABCDE12345
+BUNDLE_ID_PREFIX = com.yourname
+```
+
+`Config.xcconfig` includes `Local.xcconfig` when it exists, so your values reach every place that needs them
+(the three bundle ids, both entitlements, the code, and `build.sh`, which reads the bundle id back from the
+built app). `ios/Local.xcconfig` is in the repository's `.gitignore`: your team id and bundle ids stay on your
+Mac and can't be committed by accident. Nothing else names them: the unified-log subsystem is the bundle id at
+run time, `project.yml` and the two `.entitlements` files only hold `$(…)` references.
+
+- `com.example.*` can't be registered by more than one team, so a device build always needs your own prefix.
 - The Hotspot Configuration entitlement (`com.apple.developer.networking.HotspotConfiguration`, used to join the
   clip's `PixelClip-XXXX` network) is only available to a **paid** Apple Developer Program team; a free personal team
   can't sign a device build with it.
+- `./build.sh device` and `device-release` pass `-allowProvisioningUpdates`: Xcode may register the iPhone and
+  create App IDs, the App Group and profiles in your Apple account.
+
+## Shared content, limits and what is kept
+
+What the app takes in from outside (a page or a link shared from another app, a file picked in Files, whatever
+answers as the clip) is somebody else's data. The rules it is handled by, and what the app keeps on the phone:
+
+**Shared items can't crash the app twice.** The Share Extension only writes into the App Group
+(`ReaderInbox/`, `MediaInbox/`). When the app becomes active it **claims** an item before reading it: the file
+is moved to `Processing/` (`InboxClaims`, PixelClipKit/Inbox), then decoded and parsed off the main thread
+under a deadline (20 s for a text or page, 30 s for a picture or video), then deleted. Anything still in
+`Processing/` at a later launch was being read when the app died: it is deleted unread, and the app says "A
+shared item couldn’t be opened." A shared link is fetched after the texts and pages, and asked for three times
+at most (`LinkRetry`; being offline doesn't count, a "404" or "not a web page" is final).
+
+**Limits**, each far above real use; past one the import stops with a short message rather than a crash:
+
+| What | Limit | Then |
+|---|---|---|
+| HTML nesting | 512 open elements (a browser's own limit) | deeper elements stay children of the deepest one; the text is kept |
+| HTML size, nodes | 12 MB, 400,000 nodes | the rest of the page isn't read (a shared page that big falls back to its visible text) |
+| A fetched page or text | 12 MB, 60 s in all, 20 s of silence, 5 redirects | "That’s too big for the Reader." / "The site took too long to answer." |
+| A fetched EPUB | 64 MB | the same |
+| An EPUB entry | what its directory declares, at most 64 MB | the book can't be opened |
+| An EPUB's chapters | 128 MB inflated in all, 10,000 spine items | the import stops there (the clip keeps 1 MB of text anyway) |
+| Markdown, EPUB text | 2 MB of text | the import stops there (the clip keeps 1 MB) |
+| A file from Files | 256 MB | "That’s too big for the Reader." |
+| A shared picture / video | 200 MB / 2 GB | the share sheet says so |
+| A shared text, title | 4 MB, 300 characters | cut there |
+| The clip's answers | JSON 256 KB, a screenshot exactly 257,280 bytes, the battery log 1 MB, an asset 16 MB | "Unexpected reply from the clip" |
+
+**Links** (`TextImporter.fetch`): only `http` and `https`; no `file:`, `data:` or other schemes. Each fetch
+uses a throw-away session: no cookies, no cache, nothing written to disk. Redirects are checked again and may
+not lead to this device, a link-local address or a private network (unless the link itself pointed there), so a
+shared link can't be used to reach things on the user's own network. Only what the URL says is checked: a public
+name that resolves to a private address is not caught. This is the app's one use of the internet: the site of a
+shared link sees one request from the phone, with a Safari `User-Agent` (sites serve readers' markup to it) and
+the phone's language list. Everything else stays between the phone and the clip.
+
+**The clip's HTTP client** refuses redirects and reads every answer against a size limit for its route.
+
+**Kept on the phone**
+
+- `Application Support/Library/items/<id>/`: the rendered `.hca`, a thumbnail and the **original** of each photo,
+  GIF or video, as picked (with its metadata, location included), so it can be edited again. Kept until the
+  item is removed; included in device backups.
+- `Application Support/Reader/texts/`: every imported text, until deleted.
+- The App Group inboxes: a shared item from the moment it is shared until the app is next opened (then it is
+  deleted, imported or not). For a page shared from Safari that is the page's HTML without its scripts, styles,
+  frames, form fields and comments (`PixelClipSharePreprocessor.js` drops them before anything is stored).
+- Temporary copies are deleted when done: the extension's `tmp/share-…` when the item is saved or cancelled
+  (and at its next start), the app's `tmp/import-…` when the crop screen closes (and at launch).
+- UserDefaults: settings, the playlist, what is on the clip, and the hotspot password (in plain text).
+
+**File protection.** The inboxes are `NSFileProtectionComplete` (readable only while the iPhone is unlocked;
+the app and the extension only run on screen). The library and the Reader's texts are
+`NSFileProtectionCompleteUntilFirstUserAuthentication`, the system default, set explicitly: their stores load
+at process start and write their index back, so they must never find their files sealed (`Shared/DataProtection.swift`).
 
 ## Design notes
 
 - **Accent: soft violet** (`#C6A2FF` in dark mode, `#8445CE` in light mode; in PixelClipKit as `BrandPalette` /
-  `RGBAColor.accent`, in the firmware as `UI_ACCENT`), so the app, the icon (dot-matrix Zo/né) and the clip's
+  `RGBAColor.accent`, in the firmware as `UI_ACCENT`), so the app, the icon and the clip's
   system screens share one colour. It is
   RGB565-exact (`C51F`), so the clip shows it without dithering, and it stays luminous on the
   true-black, dark-first UI (10.0:1 on black, 8.1:1 on `#1C1C1E`). The light-mode sibling keeps the

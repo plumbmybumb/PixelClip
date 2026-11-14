@@ -20,6 +20,14 @@ static void die(const char *fmt, ...) {
     exit(1);
 }
 
+/* Largest image the tools decode: 16 Mpx (a full strip is 8192 x 240 = 2 Mpx). A 0.5 MB .hca or a few-KB PNG can
+ * claim 65535 x 65535 (8.6 GB of RGB565): refuse it before allocating. */
+#define TOOL_MAX_PIXELS (16u * 1024u * 1024u)
+static inline void check_pixels(const char *what, uint64_t w, uint64_t h) {
+    if (w == 0 || h == 0 || w * h > TOOL_MAX_PIXELS) die("%s: %llu x %llu is more than the tools handle (%u pixels)", what,
+                                                         (unsigned long long)w, (unsigned long long)h, TOOL_MAX_PIXELS);
+}
+
 static inline void *xmalloc(size_t n) {
     void *p = malloc(n ? n : 1);
     if (!p) die("out of memory (%zu bytes)", n);

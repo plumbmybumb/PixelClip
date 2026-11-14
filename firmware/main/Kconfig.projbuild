@@ -1,16 +1,16 @@
-menu "Hair Clip"
+menu "PixelClip"
 
     # Options of reusable components live with the component, so other projects that reuse them
-    # get them too: display (HAIRCLIP_LCD_*) in components/display/Kconfig, power
-    # (HAIRCLIP_CPU_*, HAIRCLIP_AUTO_LIGHT_SLEEP, HAIRCLIP_BATTERY_SAMPLE_S, HAIRCLIP_BAT_ADC_GPIO) in
+    # get them too: display (PIXELCLIP_LCD_*) in components/display/Kconfig, power
+    # (PIXELCLIP_CPU_*, PIXELCLIP_AUTO_LIGHT_SLEEP, PIXELCLIP_BATTERY_SAMPLE_S, PIXELCLIP_BAT_ADC_GPIO) in
     # components/power/Kconfig, PIXELCLIP_RTC_WDT_TIMEOUT_S in components/health/Kconfig.
 
-    config HAIRCLIP_WIFI_CHANNEL
+    config PIXELCLIP_WIFI_CHANNEL
         int "SoftAP channel"
         range 1 13
         default 6
 
-    config HAIRCLIP_WIFI_MAX_TX_DBM
+    config PIXELCLIP_WIFI_MAX_TX_DBM
         int "SoftAP max TX power on USB (dBm)"
         range 2 20
         default 10
@@ -18,7 +18,7 @@ menu "Hair Clip"
             Caps radio TX power to limit peak current and heat (500 mAh / 0.5 A cell; the SoftAP
             idles at roughly 100 mA, TX bursts reach ~300 mA at full power).
 
-    config HAIRCLIP_WIFI_MAX_TX_DBM_BATTERY
+    config PIXELCLIP_WIFI_MAX_TX_DBM_BATTERY
         int "SoftAP max TX power on battery (dBm)"
         range 2 20
         default 8

@@ -100,6 +100,9 @@ int main(int argc, char **argv) {
     size_t npx = 0;
     for (int f = 0; f < ninputs; f++) {
         int iw, ih, comp;
+        /* the header first: a small PNG can claim a huge image (stb would allocate and inflate all of it) */
+        if (!stbi_info(inputs[f], &iw, &ih, &comp)) die("%s: %s", inputs[f], stbi_failure_reason());
+        check_pixels(inputs[f], (uint64_t)iw, (uint64_t)ih);
         uint8_t *img = stbi_load(inputs[f], &iw, &ih, &comp, 4);
         if (!img) die("%s: %s", inputs[f], stbi_failure_reason());
         if (crop) {

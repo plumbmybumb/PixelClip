@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- No tracking, no data collection. UserDefaults stores only this app's own settings
-     (hotspot password, last sync, welcome pages seen) — reason CA92.1: app-only access.
-     File timestamps: the Library and the share inbox read modification dates of
-     their own files in the app container and App Group to trim the oldest — reason C617.1. -->
+<!-- No tracking, no data collection. The one required-reason API the app uses is UserDefaults, for its
+     own settings (hotspot password, playlist, what is on the clip, reading speed, last clock sync):
+     reason CA92.1, app-only access. Nothing reads file timestamps, disk space, the boot time or the
+     keyboard list (the inboxes are ordered by file name). The Share Extension uses none of them and
+     has no manifest. -->
 <plist version="1.0">
 <dict>
 	<key>NSPrivacyTracking</key>
@@ -20,14 +21,6 @@
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
 				<string>CA92.1</string>
-			</array>
-		</dict>
-		<dict>
-			<key>NSPrivacyAccessedAPIType</key>
-			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
-			<key>NSPrivacyAccessedAPITypeReasons</key>
-			<array>
-				<string>C617.1</string>
 			</array>
 		</dict>
 	</array>

@@ -25,10 +25,12 @@ int main(int argc, char **argv) {
     hca_status_t st = hca_open(&a, data, size);
     if (st != HCA_OK) die("%s: %s", argv[1], hca_status_str(st));
     int w = a.hdr.width, h = a.hdr.height, n = a.hdr.frame_count;
+    check_pixels(argv[1], (uint64_t)w, (uint64_t)h);
 
     if (strip) {
         int sw = w * n;
         if (sw > 65535) die("strip too wide");
+        check_pixels("--strip", (uint64_t)sw, (uint64_t)h);
         uint16_t *fb = xmalloc((size_t)sw * h * 2);
         for (int i = 0; i < n; i++) {
             st = hca_decode_frame(&a, (uint16_t)i, fb + (size_t)i * w, (uint16_t)sw);

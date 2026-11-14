@@ -49,7 +49,7 @@ enum DemoContent {
                                                                            playlist: playlist, options: SyncOptions(endSession: false))
                 await session.connect()
                 if report.timeSet { session.recordClockSync() }
-                if report.succeeded { ClipDocument.markSent(library: library) }
+                if report.succeeded { ClipDocument.markSent(library: library, deviceID: session.status?.device.id) }
             }
         }
         if args.contains("-PixelClipPlaylistDemo") { await seedPlaylist(library: library) }
@@ -63,7 +63,7 @@ enum DemoContent {
                 }
                 let report = await SyncEngine(client: session.virtualClip).sync(local: ClipDocument.localAssets(for: playlist, library: library),
                                                                                 playlist: playlist, options: SyncOptions(endSession: true))
-                if report.succeeded { ClipDocument.markSent(library: library) }
+                if report.succeeded { ClipDocument.markSent(library: library, deviceID: session.status?.device.id) }
                 let clip = session.virtualClip
                 if let j = args.firstIndex(of: "-PixelClipTarotDraw"), args.indices.contains(j + 1) {
                     // "a,b,c" forces the row; anything else draws at random

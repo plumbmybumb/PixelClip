@@ -1,4 +1,10 @@
-# Hardware reference: Waveshare ESP32-S3-AMOLED-1.91 (non-touch) on a 220 mAh LiPo
+# Hardware reference: Waveshare ESP32-S3-AMOLED-1.91 (non-touch)
+
+> **Which cell this page assumes.** This page was written around the 220 mAh 402030 cell the project started with
+> (section 8). The build later moved to a 500 mAh 602040 cell rated 0.5 A, which is what [`PARTS.md`](PARTS.md)
+> and [`BUILD.md`](BUILD.md) specify. Unless a figure below says otherwise, C-rates, runtimes and the "0.2 A" rating
+> are for the 220 mAh cell. For the 500 mAh cell: the unmodified 1 kOhm R1 (about 1 A) is about 2 C, 4.7 kOhm
+> (about 210 mA) is about 0.4 C, and 9.1 kOhm (about 110 mA) about 0.2 C.
 
 _Written 2026-10-10, before the first bring-up. Sources are listed at the end. **UNCONFIRMED** = could not be verified from the schematic, demo code or datasheets; measure or check before relying on it. "Schematic" = Waveshare's published schematic (one page, no revision number; link under Sources). "Demo" = Waveshare's demo repository (link under Sources). Neither is included in this repository._
 
@@ -10,7 +16,7 @@ _Written 2026-10-10, before the first bring-up. Sources are listed at the end. *
 | RM67162 display driver | Waveshare's product page and resources page say RM67162. The Waveshare demo drives the panel with the `esp_lcd_sh8601` component. Both are MIPI-DCS-style QSPI controllers. Use the demo init sequence (section 4). |
 | PWR button / power-path IC | **No PWR button, no power latch, no power switch.** Only BOOT (GPIO0) and RESET (EN). Power path is a discrete diode plus P-MOSFET. |
 | Battery ADC may exist | Yes: GPIO1 through a 100k/100k divider (always connected). |
-| Charge current | The PL4054 PROG resistor is 1 kOhm, nominally about 1 A. That is about 4.5 C for a 220 mAh cell. See section 3. |
+| Charge current | The PL4054 PROG resistor is 1 kOhm, nominally about 1 A. That is about 4.5 C for a 220 mAh cell and about 2 C for the 500 mAh reference cell. It flows whenever USB and the cell are both connected; software cannot stop it. See section 3. |
 | Flash 16 MB / PSRAM 8 MB | Confirmed from part numbers (section 5). |
 
 ## 1. Block diagram in words
@@ -75,8 +81,8 @@ QSPI display mapping used by the demo: CS=6, CLK=47, D0=18, D1=7, D2=48, D3=5, R
 | Item | Finding |
 |---|---|
 | Charger | **PL4054** (PL1, 5-pin SOT-23, TP4054/LTC4054 family linear charger, 4.2 V). Input `VBUS-B` from USB VCC. CHRG pin drives LED L1 through 470R. No MCU status line. PL4054 datasheet not found; the 4054-family relation is I_charge = 1000 / R_PROG(kOhm) (confirmed for STC4054 and LP4054; for PL4054 itself **UNCONFIRMED**). |
-| Charge current | R1 = **1 kOhm** on PROG, so roughly **1000 mA programmed** (thermally throttled in practice, TP4054-class max is about 800 mA). For a 220 mAh cell that is 3.6 to 4.5 C, far above the usual 0.5 C standard / 1 C max. **Do not charge the 220 mAh cell from this board unmodified.** Fix: change R1 to about 9.1 kOhm (about 110 mA, 0.5 C) or 4.7 kOhm (about 210 mA, about 1 C). Check the cell's own datasheet. Confirm real current with a USB meter. |
-| Charge/run independence | The charger sees USB VCC directly and connects to the BAT node, while the system load hangs on VSYS through D1. The board runs from USB while the cell charges. |
+| Charge current | R1 = **1 kOhm** on PROG, so roughly **1000 mA programmed** (thermally throttled in practice, TP4054-class max is about 800 mA). For a 220 mAh cell that is 3.6 to 4.5 C, far above the usual 0.5 C standard / 1 C max. **Do not charge the 220 mAh cell from this board unmodified.** Fix: change R1 to about 9.1 kOhm (about 110 mA, 0.5 C for 220 mAh) or 4.7 kOhm (about 210 mA, about 1 C for 220 mAh, about 0.4 C for the 500 mAh reference cell, the value [`PARTS.md`](PARTS.md) specifies). Check the cell's own datasheet. Confirm real current with a USB meter. |
+| Charge/run independence | The charger sees USB VCC directly and connects to the BAT node, while the system load hangs on VSYS through D1. The board runs from USB while the cell charges. **The charger is not under software control**: no GPIO enables or disables it, so whenever USB is connected and a cell is plugged in, the cell charges at the current R1 sets, including during flashing and debugging. |
 | Battery connector | Waveshare product page: "3.7V MX1.25 lithium battery recharge/discharge header" (2 pins, MX1.25 = Molex Picoblade-style 1.25 mm). Schematic symbol BAT1: pin 1 to net BAT, pin 2 to GND. **Physical pin order, silkscreen polarity: UNCONFIRMED.** Many LiPo leads are wired opposite to Waveshare's convention. **Check polarity with a meter before connecting.** |
 | Battery protection | None on the board (no DW01/protection IC in the schematic). The cell must have its own protection circuit (PCM). Firmware must still stop at about 3.3 V. |
 | Power path | `VSYS` = USB through D1 (1N4148, so about 4.3 to 4.4 V at light load, lower at 300 mA) or BAT through Q1 (APM2307 P-MOSFET). Q1 gate: R9 1k from USB VCC, R11 10k to GND. USB absent: gate at 0 V, Q1 on, VSYS = Vbat minus I x Rds(on). USB present: gate about 4.5 V, Q1 off. MOSFET pin/body-diode orientation **UNCONFIRMED**; the standard behaviour is as above. Gate divider draws 5/11k = 0.45 mA, only while USB is attached. |
@@ -124,6 +130,8 @@ Action: download the dimension ZIP (with your approval) and fill rows marked UNC
 
 ## 7. What this means for a 220 mAh hair clip
 
+_The figures in this section are for the 220 mAh cell; the released build uses 500 mAh (see the note at the top). Its own runtime estimate is in [`PARTS.md`](PARTS.md)._
+
 Budget logic: the 3.3 V rail comes from a linear LDO, so **battery mA = rail mA + LDO quiescent**. Datasheet figures below are for the bare chip at 3.3 V, 25 C; the S3R8 variant draws more than the non-PSRAM numbers (the datasheet says so), and the AMOLED numbers are **my estimates, not datasheet values** (no panel current spec is available). Replace them with measurements on the real board.
 
 | State | Expected battery current | Basis |
@@ -166,7 +174,11 @@ Runtime sanity (usable about 85% of 220 mAh = 187 mAh): 50 mA gives about 3.7 h;
 - Board size (secondary source): https://www.cnx-software.com/2024/10/22/esp32-s3-board-features-1-91-inch-amoled-display-and-qmi8658-6-axis-motion-sensor/
 - 4054-family charge current formula: STC4054 https://www.st.com/resource/en/datasheet/stc4054.pdf and LP4054 https://www.lowpowersemi.com/storage/files/2023-05/1a8d7aac98bab67705c58652b8895561.pdf (PL4054 datasheet not located).
 
-## 8. The battery actually purchased (added 2026-10-10)
+## 8. The battery first purchased (added 2026-10-10)
+
+_History: this is the first cell bought for the project. The build later moved to a 500 mAh 602040 cell sold under
+the same name (0.5 A, protection PCB), with R1 changed to 4.7 kOhm; see [`PARTS.md`](PARTS.md). The polarity check
+and the low-battery behaviour below apply to both cells._
 
 HXJNLDC 402030 LiPo, 3.7 V nominal / 4.2 V full, 220 mAh (0.81 Wh), 4 × 20 × 31 mm, 5 g, JST-style 1.25 mm 2-pin
 connector, red = +, black = −. Listing states **maximum current 0.2 A** and a built-in protection PCB (Seiko IC:
@@ -175,7 +187,7 @@ overcharge, over-discharge, overcurrent, short circuit).
 | Implication | Detail |
 |---|---|
 | Charge current | The pack protection does **not** limit charge current to a safe value: 4054-class chargers push ~1 A with R1 = 1 kΩ, and protection-IC overcurrent thresholds are typically 1–3 A. **R1 must still be changed (9.1 kΩ ≈ 110 mA = 0.5 C) or the cell charged externally at ≤ 110 mA.** |
-| Over-discharge cutoff | The protection IC will hard-cut the cell around 2.5–3.0 V; the board then browns out abruptly and the ESP32 cannot shut down cleanly. Firmware must deep-sleep at **3.40 V** (≈ 8 %) so the pack never reaches its own cutoff. Deep-sleep draw (~10 µA board + 20 µA divider + protection IC) still drains a 220 mAh cell in ~6–8 months: unplug for long storage. |
+| Over-discharge cutoff | The protection IC will hard-cut the cell around 2.5–3.0 V; the board then browns out abruptly and the ESP32 cannot shut down cleanly. Firmware must deep-sleep before that so the pack never reaches its own cutoff. As built, the firmware has a hard floor at **3.40 V** and, by default, sleeps at **8 %** on its own scale, where 0 % is 3.40 V; 8 % is about **3.66 V** (`firmware/components/power/power.c`; the percentage is the `low_battery_pct` config setting). Deep-sleep draw (~10 µA board + 20 µA divider + protection IC) still drains a 220 mAh cell in ~6–8 months: unplug for long storage. |
 | 0.2 A max discharge | That is a 1 C rating, not a hard trip. WiFi TX peaks of ~0.3 A for a few ms will not trip protection but will sag the cell; mitigations in §7 (TX power cap, display off during WiFi, 470–1000 µF bulk capacitor on VSYS/BAT) all apply. Steady-state display-on draw (≈ 60–100 mA) is comfortably inside the rating. |
 | Connector polarity | **Check before plugging in.** Waveshare 1.25 mm battery headers are frequently wired opposite to Amazon packs. With a multimeter: the board pin that beeps to GND (USB shell, any GND header pin) must receive the **black** wire. If reversed, swap the crimp contacts in the plug housing (lift the retention tab with a pin) rather than cutting wires. The schematic names pin 1 = BAT, pin 2 = GND, but the physical orientation is UNCONFIRMED (§6). |
 | Mechanical | 20 × 31 mm footprint vs a ≈ 57.5 × 24.5 mm board: it fits behind the board. Pouch cells must not be bent, pierced or clamped by the clip spring; leave 1 mm of foam between cell and clip. |

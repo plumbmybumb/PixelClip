@@ -9,8 +9,8 @@ A small AMOLED screen you wear as a hair clip, and the iPhone app that feeds it.
 
 PixelClip is everything you need to build one: firmware for an off-the-shelf ESP32-S3 display board, a SwiftUI
 companion app, a 3-D printable case, a parts list and a build guide. The phone does the heavy work (cropping,
-dithering, text rendering, encoding); the clip decompresses and shows what it is sent, runs for hours on a small
-LiPo cell, and needs no internet.
+dithering, text rendering, encoding); the clip decompresses and shows what it is sent, runs from a small LiPo
+cell (about 5.5 hours by the project's estimate, not yet measured), and needs no internet.
 
 <p align="center">
   <img src="docs/images/app-home.png" alt="The app's home screen" width="230">
@@ -147,14 +147,42 @@ Developer membership. More detail: "Bundle id and signing" in [`ios/README.md`](
 
 ## Things to know before you wear it
 
-- **Change the hotspot password.** Every clip starts with the same published default (`pixelclip-2026`). Set your
-  own on the clip with the `ap_password` config key (`PUT /config`, PROTOCOL §4), then enter the same password in
-  the app under Settings ▸ Advanced ▸ Hotspot password.
-- **The link is local and unencrypted beyond that.** The HTTP API is plain HTTP on the clip's own WPA2 hotspot, and
-  the Bluetooth service uses no pairing: anyone in radio range who speaks the protocol can wake the clip and send
-  small requests. Firmware updates over WiFi are checked by hash only, not signed.
-- **Batteries.** A LiPo cell worn on the head deserves care: use a protected cell rated for the board's charge
-  current, and do not charge it unattended.
+PixelClip is a hobby device with deliberately simple local radio links and no cloud. Treat the clip as public:
+assume that anyone standing near you could interfere with it, and do not put anything on it you would mind a
+stranger seeing or replacing.
+
+- **Bluetooth is open.** There is no pairing. Anyone within Bluetooth range who speaks the protocol
+  ([`docs/PROTOCOL.md`](docs/PROTOCOL.md) §3) can wake the clip's hotspot, read its status and playlist, change
+  brightness, orientation, the clock and other settings, and rearrange or delete what is stored on it. They
+  cannot read or set the hotspot password over Bluetooth, and pictures, texts and firmware only travel over
+  WiFi.
+- **The hotspot password is the only barrier to everything else, and every clip starts with the same published
+  default** (`pixelclip-2026`). Someone who knows it can join the hotspot (and can open it over Bluetooth), then
+  send any content and install any firmware: updates are checked by hash only, not signed. **Change the password
+  before you wear the clip in public.** Join the clip's hotspot from a computer and run:
+
+  ```sh
+  curl -X PUT -H 'Content-Type: application/json' \
+       -d '{"ap_password":"your-own-long-passphrase"}' http://192.168.4.1/config
+  ```
+
+  It takes 8 to 63 printable ASCII characters, applies from the next session, and can never be read back from
+  the clip. Then enter the same password in the app under Settings ▸ Advanced ▸ Hotspot password. If you forget
+  it, re-flash the firmware over USB with `ERASE=1 firmware/scripts/flash.sh` (this wipes the clip's content).
+- **Traffic is plain HTTP** inside the clip's own WPA2 network. There is no TLS.
+- **The clip can be recognised.** It advertises a fixed Bluetooth address and a name unique to your unit, so
+  someone who wants to follow one particular clip from place to place can.
+- **The app trusts what looks like a clip.** It talks to the first device that advertises PixelClip's Bluetooth
+  service and joins networks named `PixelClip-…`. A device imitating a clip nearby could receive what you send.
+- **Physical access is full access.** Anyone holding the clip with a USB cable can read and replace everything
+  on it. Secure boot and flash encryption are off on purpose: they burn one-time fuses and can lock a hobbyist
+  out of their own board.
+- **Batteries.** A LiPo cell worn on the head needs care: use a protected cell, change the charge resistor before
+  charging from the board ([`docs/BUILD.md`](docs/BUILD.md)), and do not charge it unattended.
+
+The review behind this list, with what was fixed and what is still open, is
+[`docs/SECURITY-AUDIT.md`](docs/SECURITY-AUDIT.md). Found a security problem? Please report it privately: see
+[`SECURITY.md`](SECURITY.md).
 
 ## Licence and credits
 
@@ -167,9 +195,18 @@ Bundled third-party material keeps its own terms:
 - `ios/Sources/Resources/Fonts/`: open fonts under the SIL Open Font License 1.1; each family's folder has its
   `OFL.txt`, and `FONTS.json` lists them.
 - `ios/Sources/Resources/Tarot/dodal/`: the trumps of Jean Dodal's Tarot de Marseille (Lyon, c. 1701), from the
-  Bibliothèque nationale de France's scans via Wikimedia Commons; public domain.
+  Bibliothèque nationale de France's scans via Wikimedia Commons; public domain. Provenance:
+  [`ios/Sources/Resources/Tarot/SOURCES.md`](ios/Sources/Resources/Tarot/SOURCES.md).
+- `firmware/components/display/display.c`: the RM67162 panel initialisation commands are taken from Waveshare's
+  ESP32-S3-AMOLED-1.91 demo.
+- `firmware/components/ui/font5x7.c` and `tools/common/dotfont5x7.h`: the classic, widely circulated 5 × 7 bitmap
+  character table; no known claim on it.
 - The firmware build downloads Espressif's ESP-IDF components and `esp_lcd_sh8601`, `joltwallet/littlefs` and
   `espressif/mdns` from the ESP Component Registry, each under its own licence.
+
+The 20 starter animation loops in `ios/Sources/Resources/Starter/` are original to this project, generated
+procedurally, and released under the same MIT licence. The case files come with no warranty; see
+[`case/README.md`](case/README.md). The full list of credits is [`docs/CREDITS.md`](docs/CREDITS.md).
 
 The tarot reading texts are original to this project. The way the three cards are read follows the structural
 method described in *The Way of Tarot* by Alejandro Jodorowsky and Marianne Costa.

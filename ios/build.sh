@@ -4,8 +4,11 @@
 #   ./build.sh              regenerate project + build for the simulator
 #   ./build.sh run          …then install + launch on the simulator (virtual clip is on by default there)
 #   ./build.sh test         PixelClipKit tests: swift test on macOS (includes C-decoder parity) + xcodebuild test on the simulator
-#   DEVICE_ID=<udid> ./build.sh device   build + install + launch on your iPhone (USB or same Wi-Fi; set
-#                           DEVELOPMENT_TEAM in project.yml first; `xcrun devicectl list devices` shows the id)
+#   DEVICE_ID=<udid> ./build.sh device           Debug build + install + launch on your iPhone (USB or same Wi-Fi).
+#   DEVICE_ID=<udid> ./build.sh device-release   The same with a Release build: what to wear. No Debug menu, no
+#                           virtual clip, no launch arguments, no console prints.
+#                           Both need your team and bundle id prefix in Local.xcconfig (copy Local.xcconfig.example);
+#                           `xcrun devicectl list devices` shows the id.
 #
 # The simulator is the newest available iOS 26+ one named $SIM_NAME (default "iPhone 17"); SIM_UDID picks one directly.
 #
@@ -15,7 +18,6 @@ set -uo pipefail
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 SIM_NAME="${SIM_NAME:-iPhone 17}"
 SCHEME="PixelClip"
-BUNDLE_ID="com.example.pixelclip"
 PROJECT="PixelClip.xcodeproj"
 DERIVED="build/DerivedData"
 LOG="build/last-build.log"
@@ -23,7 +25,12 @@ LOG="build/last-build.log"
 cd "$(dirname "$0")"
 mkdir -p build
 
-if [ -z "${SIM_UDID:-}" ] && [ "${1:-}" != "device" ]; then
+# The bundle id of a built app (it comes from Config.xcconfig / your Local.xcconfig, so it is read, not repeated here).
+bundle_id() { /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$1/Info.plist"; }
+
+case "${1:-}" in device|device-release) ON_DEVICE=1 ;; *) ON_DEVICE=0 ;; esac
+
+if [ -z "${SIM_UDID:-}" ] && [ "$ON_DEVICE" = 0 ]; then
   SIM_UDID=$(xcrun simctl list devices available -j | SIM_NAME="$SIM_NAME" python3 -c '
 import json, os, re, sys
 best = None
@@ -65,15 +72,18 @@ if [ "${1:-}" = "test" ]; then
   exit 0
 fi
 
-if [ "${1:-}" = "device" ]; then
+if [ "$ON_DEVICE" = 1 ]; then
   [ -n "${DEVICE_ID:-}" ] || { echo "❌ Set DEVICE_ID to your iPhone's id (xcrun devicectl list devices)"; exit 1; }
-  xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Debug -destination "id=$DEVICE_ID" \
+  [ -f Local.xcconfig ] || echo "ℹ︎ No Local.xcconfig: signing uses the placeholders (copy Local.xcconfig.example and set your team and bundle id prefix)."
+  [ "$1" = "device-release" ] && CONFIG=Release || CONFIG=Debug
+  xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIG" -destination "id=$DEVICE_ID" \
     -derivedDataPath build/DeviceData -allowProvisioningUpdates build > "$LOG" 2>&1
   [ $? -eq 0 ] || { filter "$LOG"; echo "❌ BUILD FAILED — full log: $LOG"; exit 1; }
-  xcrun devicectl device install app --device "$DEVICE_ID" build/DeviceData/Build/Products/Debug-iphoneos/PixelClip.app >/dev/null \
+  APP="build/DeviceData/Build/Products/$CONFIG-iphoneos/PixelClip.app"
+  xcrun devicectl device install app --device "$DEVICE_ID" "$APP" >/dev/null \
     || { echo "❌ Install failed — is the iPhone connected and trusted?"; exit 1; }
-  echo "✅ Installed on your iPhone"
-  if xcrun devicectl device process launch --device "$DEVICE_ID" "$BUNDLE_ID" >/dev/null 2>&1; then
+  echo "✅ Installed on your iPhone ($CONFIG build)"
+  if xcrun devicectl device process launch --device "$DEVICE_ID" "$(bundle_id "$APP")" >/dev/null 2>&1; then
     echo "▶︎ Launched"
   else
     echo "ℹ︎ Couldn’t open it automatically (phone locked?) — unlock and tap PixelClip."
@@ -93,5 +103,5 @@ if [ "${1:-}" = "run" ]; then
   APP="$DERIVED/Build/Products/Debug-iphonesimulator/PixelClip.app"
   xcrun simctl boot "${SIM_UDID}" 2>/dev/null || true
   shift
-  xcrun simctl install "${SIM_UDID}" "$APP" && xcrun simctl launch "${SIM_UDID}" "$BUNDLE_ID" "$@" >/dev/null && echo "▶︎ Launched on simulator"
+  xcrun simctl install "${SIM_UDID}" "$APP" && xcrun simctl launch "${SIM_UDID}" "$(bundle_id "$APP")" "$@" >/dev/null && echo "▶︎ Launched on simulator"
 fi

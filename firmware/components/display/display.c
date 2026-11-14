@@ -2,7 +2,7 @@
  *
  * Flush strategy: the 257 KB framebuffer lives in PSRAM. The ESP32-S3 SPI master can only DMA from
  * internal RAM (it would otherwise malloc a temporary internal copy of every transaction), so we
- * flush through two internal DMA "bounce" buffers of CONFIG_HAIRCLIP_LCD_BOUNCE_ROWS rows each,
+ * flush through two internal DMA "bounce" buffers of CONFIG_PIXELCLIP_LCD_BOUNCE_ROWS rows each,
  * ping-ponging: the memcpy of band n+1 overlaps the DMA transfer of band n.
  */
 #include "display.h"
@@ -35,9 +35,9 @@ static const char *TAG = "display";
 #define PIN_LCD_D3   5
 #define PIN_LCD_RST  17
 #define LCD_HOST     SPI2_HOST
-/* Panel enable (CONFIG_HAIRCLIP_LCD_EN_GPIO): -1 on the Waveshare board; GPIO38 on the LilyGo T-Display-S3
+/* Panel enable (CONFIG_PIXELCLIP_LCD_EN_GPIO): -1 on the Waveshare board; GPIO38 on the LilyGo T-Display-S3
  * AMOLED V2, which must be high before the panel is reset. */
-#define PIN_LCD_EN   CONFIG_HAIRCLIP_LCD_EN_GPIO
+#define PIN_LCD_EN   CONFIG_PIXELCLIP_LCD_EN_GPIO
 
 #define LCD_OPCODE_WRITE_CMD 0x02
 #define LCD_CMD_BRIGHTNESS   0x51
@@ -54,7 +54,7 @@ static const char *TAG = "display";
  * MX/MY act on the MCU -> GRAM write addressing, so the picture already in GRAM only turns over when it is
  * written again: display_set_flipped() re-sends the whole framebuffer right after the register write.
  * (If this controller applied them on readout instead, the re-send would still be correct: one mirror.) */
-#define MADCTL_NORMAL        CONFIG_HAIRCLIP_LCD_MADCTL   /* 0xF0 on the Waveshare board (Kconfig) */
+#define MADCTL_NORMAL        CONFIG_PIXELCLIP_LCD_MADCTL   /* 0xF0 on the Waveshare board (Kconfig) */
 #define MADCTL_FLIP_BITS     0xC0          /* MY | MX */
 #define MADCTL_FLIPPED       (MADCTL_NORMAL ^ MADCTL_FLIP_BITS)
 
@@ -75,7 +75,7 @@ static const char *TAG = "display";
 
 /* Band height must be even: the RM67162 window (CASET/RASET) needs even start / odd end rows and
  * columns (the Waveshare demo's LVGL rounder enforces the same). 24 rows -> 10 bands per frame. */
-#define BOUNCE_ROWS  (CONFIG_HAIRCLIP_LCD_BOUNCE_ROWS & ~1)
+#define BOUNCE_ROWS  (CONFIG_PIXELCLIP_LCD_BOUNCE_ROWS & ~1)
 #define BOUNCE_BYTES (DISPLAY_W * BOUNCE_ROWS * 2)
 
 /* RM67162 init sequence from the Waveshare demo (example_qspi_with_ram.c), byte for byte, except
@@ -83,7 +83,7 @@ static const char *TAG = "display";
  * in after the first frame is in GRAM. MADCTL 0xF0 gives the 536x240 landscape orientation. */
 static const sh8601_lcd_init_cmd_t s_init_cmds[] = {
     {0x11, (uint8_t[]){0x00}, 0, 120},             /* sleep out */
-    {0x36, (uint8_t[]){MADCTL_NORMAL}, 1, 0},      /* MADCTL (CONFIG_HAIRCLIP_LCD_MADCTL) */
+    {0x36, (uint8_t[]){MADCTL_NORMAL}, 1, 0},      /* MADCTL (CONFIG_PIXELCLIP_LCD_MADCTL) */
     {0x3A, (uint8_t[]){0x55}, 1, 0},               /* 16-bit RGB565 */
     {0x2A, (uint8_t[]){0x00, 0x00, 0x02, 0x17}, 4, 0}, /* CASET 0..535 */
     {0x2B, (uint8_t[]){0x00, 0x00, 0x00, 0xEF}, 4, 0}, /* RASET 0..239 */
@@ -151,7 +151,7 @@ void display_sleep_pins_apply(void)
         esp_err_t err = gpio_sleep_sel_dis((gpio_num_t)pins[i]);
         if (err != ESP_OK) ESP_LOGW(TAG, "gpio_sleep_sel_dis(%d): %s", pins[i], esp_err_to_name(err));
     }
-#if CONFIG_HAIRCLIP_LCD_EN_GPIO >= 0
+#if CONFIG_PIXELCLIP_LCD_EN_GPIO >= 0
     esp_err_t err = gpio_sleep_sel_dis((gpio_num_t)PIN_LCD_EN);   /* the enable must not float in light sleep */
     if (err != ESP_OK) ESP_LOGW(TAG, "gpio_sleep_sel_dis(%d): %s", PIN_LCD_EN, esp_err_to_name(err));
 #endif
@@ -159,7 +159,7 @@ void display_sleep_pins_apply(void)
 
 static esp_err_t panel_init(void)
 {
-#if CONFIG_HAIRCLIP_LCD_EN_GPIO >= 0
+#if CONFIG_PIXELCLIP_LCD_EN_GPIO >= 0
     /* Panel enable first (LilyGo V2: GPIO38): the panel only answers once it is powered. */
     const gpio_config_t en = { .pin_bit_mask = 1ULL << PIN_LCD_EN, .mode = GPIO_MODE_OUTPUT };
     ESP_RETURN_ON_ERROR(gpio_config(&en), TAG, "enable gpio");
@@ -175,7 +175,7 @@ static esp_err_t panel_init(void)
      * quad_mode. Only the queue depth differs (4 vs 10): we never queue more than one colour
      * transaction, because every tx_param drains the queue first. */
     esp_lcd_panel_io_spi_config_t io_cfg = SH8601_PANEL_IO_QSPI_CONFIG(PIN_LCD_CS, on_color_done, NULL);
-    io_cfg.pclk_hz = CONFIG_HAIRCLIP_LCD_PCLK_MHZ * 1000 * 1000;
+    io_cfg.pclk_hz = CONFIG_PIXELCLIP_LCD_PCLK_MHZ * 1000 * 1000;
     io_cfg.trans_queue_depth = 4;
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &io_cfg, &s_io),
                         TAG, "panel io");
@@ -239,7 +239,7 @@ esp_err_t display_init(void)
 
     err = display_flush_full();
     ESP_LOGI(TAG, "AMOLED %dx%d up, QSPI %d MHz, bounce %d rows x2 (%d B internal), full flush %lu us",
-             DISPLAY_W, DISPLAY_H, CONFIG_HAIRCLIP_LCD_PCLK_MHZ, BOUNCE_ROWS, 2 * BOUNCE_BYTES,
+             DISPLAY_W, DISPLAY_H, CONFIG_PIXELCLIP_LCD_PCLK_MHZ, BOUNCE_ROWS, 2 * BOUNCE_BYTES,
              (unsigned long)s_last_full_us);
     if (err != ESP_OK) ESP_LOGE(TAG, "initial flush: %s", esp_err_to_name(err));
     return err;

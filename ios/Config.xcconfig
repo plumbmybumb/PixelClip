@@ -1,0 +1,20 @@
+// Build settings that name who built the app. XcodeGen attaches this file to both configurations
+// (project.yml ▸ configFiles).
+//
+// The values here are placeholders: with them the simulator build, `./build.sh run` and `./build.sh test`
+// work with no setup. To build for an iPhone, don't edit this file: copy Local.xcconfig.example to
+// Local.xcconfig (git-ignored) and set your own values there. They then reach every place that needs
+// them: the three bundle ids, both targets' App Group entitlement, and the code (through the
+// PixelClipAppGroup Info.plist key).
+
+// Your Apple team id (Xcode ▸ Settings ▸ Accounts). Empty: simulator builds only.
+DEVELOPMENT_TEAM =
+
+// The bundle ids are <prefix>.pixelclip, <prefix>.pixelclip.share and <prefix>.pixelclip.uitests.
+BUNDLE_ID_PREFIX = com.example
+
+// The App Group the app and its Share Extension hand shared items over in.
+APP_GROUP_ID = group.$(BUNDLE_ID_PREFIX).pixelclip
+
+// Your own values, when the file exists (the "?" makes it optional). Last, so it wins.
+#include? "Local.xcconfig"

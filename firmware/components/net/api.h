@@ -5,7 +5,7 @@
  *     socket (bulk endpoints stream it with ops->recv), the response goes out with httpd_resp_*;
  *   - the BLE fast lane (api_ble.c, PROTOCOL §3b): the reassembled "METHOD SP path LF [body]" -> api_req_t
  *     with the body already in memory, the response is collected into the fast-lane buffer as
- *     "STATUS SP LF [body]". No recv / header hooks: the bulk routes are refused before dispatch.
+ *     "STATUS SP LF [body]". No recv / header hooks: the WiFi-only routes are refused before dispatch.
  * Handlers run one at a time (api_lock), as they did when the httpd task was their only caller.
  */
 #pragma once
@@ -22,8 +22,9 @@ typedef struct {
     esp_err_t (*send)(api_req_t *r, const char *status, const char *type, const char *data, size_t len);
     /* Chunked response with status 200: data == NULL ends it; `type` is applied before the first chunk. */
     esp_err_t (*send_chunk)(api_req_t *r, const char *type, const char *data, size_t len);
-    /* Streaming request body (bytes received, <= 0 on error, HTTPD_SOCK_ERR_TIMEOUT to retry) and request
-     * headers. HTTP only (NULL on the fast lane): used by the bulk endpoints. */
+    /* Streaming request body: bytes received (> 0), or <= 0 when the request is over for the handler (closed,
+     * stalled, too slow, session ending: http_api.c "slow-client guard"; the adapter does the waiting). And
+     * request headers. HTTP only (NULL on the fast lane): used by the bulk endpoints and the header checks. */
     int (*recv)(api_req_t *r, char *buf, size_t len);
     bool (*header)(api_req_t *r, const char *name, char *out, size_t out_len);
 } api_ops_t;
@@ -40,6 +41,8 @@ struct api_req {
     const api_ops_t *ops;
     void *ctx;                   /* adapter state: the httpd_req_t, or the fast-lane response writer */
     const char *transport;       /* "http" | "ble" (logs) */
+    bool ble;                    /* arrived over the BLE fast lane, which has no pairing: handlers that must
+                                  * not serve an unauthenticated peer decide on this, never on `transport` */
 };
 
 typedef esp_err_t (*api_handler_t)(api_req_t *r);
@@ -48,7 +51,9 @@ typedef struct {
     const char *uri;             /* esp_http_server wildcard template, e.g. "/assets/" + "*" */
     int method;
     api_handler_t handler;
-    bool bulk;                   /* bulk transfer: WiFi only (the fast lane answers 413 use_wifi) */
+    bool wifi_only;              /* never over the fast lane (it answers 413 use_wifi): the bulk transfers, and
+                                  * routes that are kept off the unpaired BLE link (/imu, /imu/calibrate,
+                                  * /queue/test: security audits WIFI-10 / BLE-9) */
 } api_route_t;
 
 extern const api_route_t api_routes[];

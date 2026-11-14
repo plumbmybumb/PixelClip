@@ -83,7 +83,7 @@ final class SyncController {
     private var screenOn = true
     /// When each step started and ended (Debug readout, `send` log line).
     private(set) var timeline = SendTimeline()
-    static let log = Logger(subsystem: "com.example.pixelclip", category: "send")
+    static let log = Logger(subsystem: AppLog.subsystem, category: "send")
 
     private var endingLine: String { screenOn ? "Ending the session…" : "Turning the screen back on…" }
     private var endFailedLine: String {
@@ -159,7 +159,7 @@ final class SyncController {
         guard !isRunning else { return }
         reset()
         isRunning = true
-        sendLog("send: \(request.id) · start (Bluetooth Wake \(settings.bluetoothWake ? "on" : "off"), \(session.isConnected ? "on its Wi‑Fi" : session.nearby != nil ? "heard nearby" : "not heard nearby"))")
+        sendLog("send: ", peer: request.id, then: " · start (Bluetooth Wake \(settings.bluetoothWake ? "on" : "off"), \(session.isConnected ? "on its Wi‑Fi" : session.nearby != nil ? "heard nearby" : "not heard nearby"))")
         session.beginSending()
         // A previous send may still be ending its session in the background: let it finish first.
         await session.settle()
@@ -242,7 +242,7 @@ final class SyncController {
             return
         }
         screenOn = session.screenStaysOn
-        sendLog("send: status read · \(status.playlist.current ?? "nothing") on screen")
+        sendLog("send: status read · ", peer: status.playlist.current ?? "nothing", then: " on screen")
         let battery = BatteryReading(status.battery)
         steps[.connect] = .done("Battery \(battery.pct.map { "\($0)%" } ?? "–")\(battery.onUSB ? ", charging" : "") · \(status.storage.free.byteString) free\(usesFastLane ? " · over Bluetooth" : "")")
 
@@ -278,7 +278,7 @@ final class SyncController {
             return false
         }
         guard joined == .joined else {
-            sendLog("send: join failed · \(session.joiner.message ?? "\(joined)")")
+            sendLog("send: join failed · ", peer: session.joiner.message ?? "\(joined)")
             fail(.join, SendProblem(join: session.joiner.failure))
             return false
         }
@@ -444,7 +444,7 @@ final class SyncController {
         }
         if report.succeeded {
             // The last upload went through: close the sheet, end the session in the background.
-            ClipDocument.markSent(library: library)
+            ClipDocument.markSent(library: library, deviceID: session.status?.device.id)
             if let doc = readerDoc {
                 steps[.finish] = .done(readsNow ? "Look at your clip: it’s reading “\(doc.title)”" : "“\(doc.title)” plays until it’s finished")
             } else {

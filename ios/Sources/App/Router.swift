@@ -58,7 +58,7 @@ struct Toast: Identifiable, Equatable {
 
 @MainActor @Observable
 final class Router {
-    var path: [Route] = []
+    var path: [Route] = [] { didSet { if oldValue != path { releaseClosedMediaSoon() } } }
     /// The Extras sheet on screen.
     var extra: ExtraRequest?
     /// Home ▸ Recent ▸ a thumbnail: the re-send sheet (a library item id).
@@ -99,10 +99,32 @@ final class Router {
     /// Shows picked or shared media in the crop screen.
     func openMedia(_ m: ImportedMedia, mode: ComposeMode) {
         let key = UUID()
-        media[key] = m
         // A crop screen already up (another share arrived) is replaced.
         if case .crop? = path.last { path.removeLast() }
+        media[key] = m
         path.append(.crop(key, mode))
+    }
+
+    /// Media whose crop screen has closed (sent, added or backed out of) is let go, and a movie's working
+    /// copy in `tmp` is deleted (the library has kept its own copy of what was sent). A moment later, so
+    /// the screen still has its picture while it slides away.
+    private func releaseClosedMediaSoon() {
+        guard !media.isEmpty else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            releaseClosedMedia()
+        }
+    }
+
+    private func releaseClosedMedia() {
+        let open = Set(path.compactMap { route -> UUID? in
+            if case .crop(let key, _) = route { return key }
+            return nil
+        })
+        for (key, m) in media where !open.contains(key) {
+            if case .video(let url, _) = m.source { MediaImporter.discardTemporaryCopy(url) }
+            media[key] = nil
+        }
     }
 
     /// Reads picked media, then opens the crop screen.

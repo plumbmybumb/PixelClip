@@ -117,6 +117,13 @@ bool board_step(board_t *b, uint32_t dt_ms)
             changed = true;
         }
     }
+    if (b->scrolling) {   /* more than 64 periods in one step (a very long dt): fold, the render walks offset / period */
+        const uint64_t p = (uint64_t)board_period(b) * 1000u;
+        if (b->offset_m >= p) {
+            b->loops += (uint32_t)(b->offset_m / p);
+            b->offset_m %= p;
+        }
+    }
     return changed || (int)(b->offset_m / 1000u) != b->drawn_offset;
 }
 

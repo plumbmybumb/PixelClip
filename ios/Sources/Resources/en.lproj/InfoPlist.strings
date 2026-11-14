@@ -2,5 +2,4 @@
 "CFBundleDisplayName" = "PixelClip";
 "NSLocalNetworkUsageDescription" = "PixelClip sends pictures and settings to your clip over the clip’s own Wi‑Fi.";
 "NSPhotoLibraryUsageDescription" = "PixelClip uses the photos and videos you pick to make pictures for your clip.";
-"NSPhotoLibraryAddUsageDescription" = "PixelClip saves screenshots of your clip to your photo library when you ask.";
-"NSBluetoothAlwaysUsageDescription" = "PixelClip uses Bluetooth to wake your clip and turn on its Wi‑Fi, so you don’t have to press its button.";
+"NSBluetoothAlwaysUsageDescription" = "PixelClip uses Bluetooth to find and wake your clip and to send it small updates.";

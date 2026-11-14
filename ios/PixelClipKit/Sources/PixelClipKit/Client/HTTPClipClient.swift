@@ -6,12 +6,31 @@ import Foundation
 /// - Retries a request once when the connection drops or can't be opened, which happens routinely
 ///   in the first second after iOS joins the hotspot.
 /// - Bodies are sent with a `Content-Length` (no chunked transfer-encoding); URLSession streams
-///   them in TCP-sized pieces and reports progress through a per-task delegate.
+///   them in TCP-sized pieces and reports progress through the session's delegate.
+/// - Every answer is read as it streams and cut off at a size limit for its route (`ResponseLimit`):
+///   whatever answers at the clip's address can't make the app buffer more than the route calls for.
+/// - Redirects are refused: the clip never sends one, and following one would re-send an upload to
+///   another host on the network.
 public final class HTTPClipClient: ClipClient {
     public static let defaultBaseURL = URL(string: "http://192.168.4.1")!
 
+    /// The most bytes accepted in an answer, per kind of route. The firmware's own ceilings are far
+    /// lower (a playlist is at most 16 KB, a font document 16 KB, the config 4 KB, the battery log a
+    /// 64 KB ring), so nothing the clip really sends comes near these.
+    public enum ResponseLimit {
+        /// Every JSON answer: status, lists, playlist, config, fonts, error envelopes.
+        public static let json = 256 << 10
+        /// `GET /screenshot`: one 536×240 RGB565 frame, exactly.
+        public static let screenshot = RGB565Frame.clipFrameBytes
+        /// `GET /batlog`.
+        public static let batteryLog = 1 << 20
+        /// `GET /assets/{id}`: the clip's whole flash is smaller.
+        public static let asset = 16 << 20
+    }
+
     public let baseURL: URL
     private let session: URLSession
+    private let exchanges = ClipExchanges()
 
     /// - Parameter protocolClasses: URL protocols to put first (tests stub the clip with one).
     public init(baseURL: URL = HTTPClipClient.defaultBaseURL, requestTimeout: TimeInterval = 6, protocolClasses: [AnyClass] = []) {
@@ -26,8 +45,10 @@ public final class HTTPClipClient: ClipClient {
         cfg.urlCache = nil
         // The clip is only reachable over WiFi; never let iOS try cellular for it.
         cfg.allowsCellularAccess = false
-        session = URLSession(configuration: cfg)
+        session = URLSession(configuration: cfg, delegate: exchanges, delegateQueue: nil)
     }
+
+    deinit { session.finishTasksAndInvalidate() }   // a session keeps its delegate until it is invalidated
 
     // MARK: Endpoints
 
@@ -72,7 +93,7 @@ public final class HTTPClipClient: ClipClient {
         guard HCA.isValidAssetID(id) else { throw ClipError.invalidAssetID(id) }
         var req = request(.get, "/assets/\(id)")
         req.timeoutInterval = 20
-        let (body, resp) = try await send(req)
+        let (body, resp) = try await send(req, limit: ResponseLimit.asset)
         try check(resp, body)
         return body
     }
@@ -108,7 +129,7 @@ public final class HTTPClipClient: ClipClient {
     public func screenshot() async throws -> RGB565Frame {
         var req = request(.get, "/screenshot")
         req.timeoutInterval = 15
-        let (body, resp) = try await send(req)
+        let (body, resp) = try await send(req, limit: ResponseLimit.screenshot)
         try check(resp, body)
         do {
             return try RGB565Frame(bigEndianBytes: body, width: ClipCanvas.width, height: ClipCanvas.height)
@@ -134,7 +155,7 @@ public final class HTTPClipClient: ClipClient {
     public func scenes() async throws -> SceneCatalog { try await json(.get, "/scenes") }
 
     public func batteryLog() async throws -> String {
-        let (body, resp) = try await send(request(.get, "/batlog"))
+        let (body, resp) = try await send(request(.get, "/batlog"), limit: ResponseLimit.batteryLog)
         try check(resp, body)
         return String(decoding: body, as: UTF8.self)
     }
@@ -255,21 +276,17 @@ public final class HTTPClipClient: ClipClient {
         }
     }
 
-    /// Sends a request, optionally with a body, retrying once on a dropped/refused connection.
+    /// Sends a request, optionally with a body, retrying once on a dropped/refused connection. The
+    /// answer is refused (`badResponse`) past `limit` bytes, or if it is a redirect.
     private func send(_ req: URLRequest, upload: Data? = nil, progress: ProgressHandler? = nil,
-                      retry: Bool = true) async throws -> (Data, HTTPURLResponse) {
+                      retry: Bool = true, limit: Int = ResponseLimit.json) async throws -> (Data, HTTPURLResponse) {
         var attempt = 0
         while true {
             attempt += 1
             do {
-                let (data, resp): (Data, URLResponse)
-                if let upload {
-                    let delegate = progress.map { UploadProgressDelegate($0) }
-                    (data, resp) = try await session.upload(for: req, from: upload, delegate: delegate)
-                    progress?(1)
-                } else {
-                    (data, resp) = try await session.data(for: req)
-                }
+                let task = upload.map { session.uploadTask(with: req, from: $0) } ?? session.dataTask(with: req)
+                let (data, resp) = try await exchanges.run(task, limit: limit, progress: upload == nil ? nil : progress)
+                if upload != nil { progress?(1) }
                 guard let http = resp as? HTTPURLResponse else { throw ClipError.badResponse("not HTTP") }
                 return (data, http)
             } catch let e as URLError {
@@ -285,14 +302,79 @@ public final class HTTPClipClient: ClipClient {
     }
 }
 
-/// Per-task delegate that forwards upload progress.
-final class UploadProgressDelegate: NSObject, URLSessionTaskDelegate, Sendable {
-    let handler: ProgressHandler
-    init(_ handler: @escaping ProgressHandler) { self.handler = handler }
+/// The clip session's delegate: collects each answer as it arrives and stops at the route's size limit,
+/// refuses redirects, and forwards upload progress.
+final class ClipExchanges: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    private struct Exchange {
+        var limit: Int
+        var progress: ProgressHandler?
+        var body = Data()
+        var response: URLResponse?
+        var refusal: String?
+        var continuation: CheckedContinuation<(Data, URLResponse), any Error>
+    }
+
+    private let lock = NSLock()
+    private var open: [Int: Exchange] = [:]
+
+    /// Runs `task` to its end; throws `ClipError.badResponse` for an oversized answer or a redirect.
+    func run(_ task: URLSessionTask, limit: Int, progress: ProgressHandler?) async throws -> (Data, URLResponse) {
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                lock.withLock { open[task.taskIdentifier] = Exchange(limit: limit, progress: progress, continuation: continuation) }
+                task.resume()
+            }
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    private func refuse(_ task: URLSessionTask, _ why: String) {
+        lock.withLock { if open[task.taskIdentifier]?.refusal == nil { open[task.taskIdentifier]?.refusal = why } }
+        task.cancel()
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+        completionHandler(nil)
+        refuse(task, "a redirect (HTTP \(response.statusCode))")
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                    completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void) {
+        let limit = lock.withLock { () -> Int in
+            open[dataTask.taskIdentifier]?.response = response
+            return open[dataTask.taskIdentifier]?.limit ?? 0
+        }
+        if response.expectedContentLength > Int64(limit) {
+            completionHandler(.cancel)
+            refuse(dataTask, "an answer of \(response.expectedContentLength) bytes (at most \(limit) expected)")
+        } else {
+            completionHandler(.allow)
+        }
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        let limit = lock.withLock { () -> Int? in
+            guard var e = open[dataTask.taskIdentifier], e.refusal == nil else { return nil }
+            e.body.append(data)
+            open[dataTask.taskIdentifier] = e
+            return e.body.count > e.limit ? e.limit : nil
+        }
+        if let limit { refuse(dataTask, "an answer of more than \(limit) bytes") }
+    }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64,
                     totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
-        guard totalBytesExpectedToSend > 0 else { return }
+        guard totalBytesExpectedToSend > 0, let handler = lock.withLock({ open[task.taskIdentifier]?.progress }) else { return }
         handler(min(1, Double(totalBytesSent) / Double(totalBytesExpectedToSend)))
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
+        guard let e = lock.withLock({ open.removeValue(forKey: task.taskIdentifier) }) else { return }
+        if let why = e.refusal { e.continuation.resume(throwing: ClipError.badResponse(why)); return }
+        if let error { e.continuation.resume(throwing: error); return }
+        guard let response = e.response else { e.continuation.resume(throwing: ClipError.badResponse("no answer")); return }
+        e.continuation.resume(returning: (e.body, response))
     }
 }

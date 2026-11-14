@@ -12,7 +12,7 @@ it in hair. The step-by-step guide is [`BUILD.md`](BUILD.md).
 |---|---|---|---|---|
 | Display board | Waveshare **ESP32-S3-AMOLED-1.91**, **non-touch** version. ESP32-S3R8 (8 MB PSRAM), 16 MB flash, 1.91-inch 536 × 240 AMOLED, QMI8658C IMU, USB-C, PL4054 LiPo charger, 2-pin 1.25 mm battery header. Board 57.5 × 24.5 mm (display module outline). | 1 | The whole clip: screen, processor, radio, motion sensor, charger. | Product page: <https://www.waveshare.com/esp32-s3-amoled-1.91.htm>. The touch version is a different size (about 59.6 × 28.5 mm) and does not fit the case. Waveshare sells it with and without pin headers ([`HARDWARE.md`](HARDWARE.md) §2 names SKU 28872 as the one without); the reference build started from a board with headers fitted and removed them. |
 | LiPo cell | Single cell, 3.7 V nominal / 4.2 V full, **500 mAh**, size **602040** (sold as about **41 × 20 × 6 mm**), maximum current **0.5 A**, **with its own protection circuit** (PCM), 2-pin **1.25 mm** connector. | 1 | Power when unplugged. | The reference cell was sold under the name HXJNLDC (602040, 500 mAh, 0.5 A, protection PCB with a Seiko IC). The board has **no battery protection of its own**, so the cell's PCM is the only protection. Expected wear time about 5.5 h always-on: an estimate, not a measured figure. |
-| Charge-current resistor | **4.7 kΩ**, **0603** SMD. The reference build ordered Panasonic **ERJ-3EKF4701V**. | 1 (they come in strips; a spare helps) | Replaces the board's R1 (1 kΩ), which programs the charger to about 1 A, twice the cell's 0.5 A rating. 4.7 kΩ gives about 210 mA (about 0.4 C for 500 mAh, roughly 2.7 h to charge). | **Computed, not measured.** The 1000 / R(kΩ) formula is confirmed for other 4054-family chargers, not for the PL4054 itself, and the project's records do not show the swap being done or the resulting current being measured. A 9.1 kΩ part gives about 110 mA if you prefer a gentler charge. See [`HARDWARE.md`](HARDWARE.md) §3. |
+| Charge-current resistor | **4.7 kΩ**, **0603** SMD. The reference build ordered Panasonic **ERJ-3EKF4701V**. | 1 (they come in strips; a spare helps) | Replaces the board's R1 (1 kΩ), which programs the charger to about 1 A, twice the cell's 0.5 A rating. The charger runs whenever USB and the cell are both connected; software cannot switch it off. 4.7 kΩ gives about 210 mA (about 0.4 C for 500 mAh, roughly 2.7 h to charge). | **Computed, not measured.** The 1000 / R(kΩ) formula is confirmed for other 4054-family chargers, not for the PL4054 itself, and the project's records do not show the swap being done or the resulting current being measured. A 9.1 kΩ part gives about 110 mA if you prefer a gentler charge. See [`HARDWARE.md`](HARDWARE.md) §3. |
 | USB-C cable | USB-C with data lines (not a charge-only cable). | 1 | Flashing the firmware and charging. | The board uses the ESP32-S3's native USB; there is no separate serial chip. The case's USB end has a cove so a plug's moulded head reaches the socket; a very wide plug head may not seat fully (not tested with a range of cables). |
 
 ### Optional electronics (not part of the reference build as far as recorded)
@@ -63,7 +63,7 @@ The case has no screws: the lid snaps on and the keys are held captive between t
 
 | Tool | What for | Notes |
 |---|---|---|
-| Computer with ESP-IDF **v5.5** | Building and flashing the firmware. | The repository's commands use macOS port names (`/dev/cu.usbmodem*`). See [`../firmware/README.md`](../firmware/README.md). |
+| Computer with ESP-IDF **v5.5** | Building and flashing the firmware. | The `v5.5` release tag (5.5.0, the version in `firmware/dependencies.lock`; see [`BUILD.md`](BUILD.md) step 2). The repository's commands use macOS port names (`/dev/cu.usbmodem*`). See [`../firmware/README.md`](../firmware/README.md). |
 | Mac with **Xcode 26** or later and XcodeGen | Building the iPhone app. | See [`../ios/README.md`](../ios/README.md). |
 | iPhone on **iOS 26** or later | Running the app. | |
 | Paid Apple Developer Program membership | Signing the app with the Hotspot Configuration entitlement it uses to join the clip's WiFi. | A free personal team cannot sign a device build with that entitlement. |
@@ -104,4 +104,6 @@ The case has no screws: the lid snaps on and the keys are held captive between t
 - **Connector type.** The board header is a 1.25 mm pitch, 2-pin type (Waveshare calls it MX1.25, a Molex
   PicoBlade-style connector). Cell listings describe their plug as "JST-style 1.25 mm". Whether the reference
   cell's plug mated as delivered is not documented, so check that yours does before you buy several.
-- **Charge current.** Do not charge any cell from the board until R1 is changed to suit it.
+- **Charge current.** Do not charge any cell from the board until R1 is changed to suit it. The board charges the
+  cell whenever USB and the cell are both connected, and software cannot stop it, so until then unplug the cell
+  before every USB connection, flashing included ([`BUILD.md`](BUILD.md), "Read this before you connect a cell").

@@ -60,7 +60,7 @@ _Written 2026-10-10. Source: Waveshare's STEP model of the board, `esp32-s3-amol
 | Shield/IC blocks `CORE01`, `CORE`, `C3` | 9.79..19.69 / 27.39..32.49 / 0.66..2.66 | 7.30..17.20 / 9.70..14.80 / 7.01..14.01 | to -2.4 / -3.2 / -2.4 | Names are CAD labels only; function UNCONFIRMED. |
 | 2.54 mm headers (2 x 1x20), if fitted | 0.53 .. 51.33 | 2.09..4.63 and 19.87..22.41 | -9.70 .. 1.60 | The "-M" SKU has them (HARDWARE.md); the base SKU does not. |
 
-- **Which button is BOOT and which is RESET: UNCONFIRMED.** The two switches are identical unlabelled solids placed at mirror positions. Check the silkscreen (schematic: B1 = BOOT, R10 = RESET).
+- **Which button is BOOT and which is RESET: UNCONFIRMED from this model.** The two switches are identical unlabelled solids placed at mirror positions. Check the silkscreen (schematic: B1 = BOOT, R10 = RESET). [`BUILD.md`](BUILD.md) step 5 places BOOT top-right and RESET bottom-right (picture upright, USB end on the right) and gives a quick test to confirm it on your board; this model can neither confirm nor contradict that.
 - Both buttons are pressed from the back (flat actuator face toward -Z'). Pressing direction is inferred from the geometry (UNCONFIRMED).
 - **Pin 1 of the battery connector is UNCONFIRMED**; the model is mirror-symmetric. Keep the multimeter polarity check from HARDWARE.md section 8.
 
@@ -74,6 +74,8 @@ _Written 2026-10-10. Source: Waveshare's STEP model of the board, `esp32-s3-amol
 - Do not clamp between front and back at X' > 40: the battery connector, USB-C and buttons make the back uneven (down to Z' -4.8).
 
 **Where a 20 x 31 x 4 mm pouch cell fits**
+
+_Written for the 220 mAh cell the project started with. The released case holds the 500 mAh 602040 cell (about 41 x 20 x 6 mm) flat under the board instead; see [`PARTS.md`](PARTS.md) and [`../case/README.md`](../case/README.md)._
 - It fits behind the board with the 31 mm side along X' and the 20 mm side across Y' (it leaves 2.25 mm per side of the 24.5 mm width). Script result, headers off, studs ignored: the only thing under a 31 x 20 footprint is the TF slot (Z' -4.05) plus lower ICs, and the footprint X' 9.0..40.0 sits between the studs (X' 6..9) and the battery connector (X' 40.74) with under 1 mm of slack. Do not count on that nesting.
 - Simple robust plan: cell fully below Z' -4.8 with 0.5 mm foam, so any X' position works and it never touches the connector, buttons or studs. Stack: display 4.2 + back parts 4.8 = 9.0, plus 0.5 foam, plus cell 4.0 (allow 4.5 for swelling), plus a 1.2 mm tray floor gives about **15 mm**. Nesting the cell at X' 9..40 against the TF slot saves about 0.75 mm.
 - **Headers fitted:** the two header bodies leave only 15.24 mm between them (Y' 4.63..19.87), narrower than the 20 mm cell, and the pin tails go to Z' -9.70. Either leave the headers off, or trim the tails flush with the plastic (Z' -3.9), or add 5.8 mm to the stack. The cell lead (red/black) should exit toward the connector (+X' end).
@@ -86,7 +88,7 @@ _Written 2026-10-10. Source: Waveshare's STEP model of the board, `esp32-s3-amol
 
 1. Real PCB outline versus the model (56.51 x 23.51 vs the 57.5 x 24.5 Waveshare quotes).
 2. Display stack height (4.0 above the PCB top is from a lumped solid).
-3. Which button is BOOT and which is RESET; button actuation side.
+3. Which button is BOOT and which is RESET (from the model; see the note in section 5); button actuation side.
 4. Battery connector pin 1 and the cable direction on the real part.
 5. TF slot depth and insertion direction.
 6. Whether the hex standoffs and header come with your board, and the hole plating.

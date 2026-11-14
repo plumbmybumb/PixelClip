@@ -453,7 +453,8 @@ scene_status_t scene_init(scene_t *s, scene_kind_t kind, const scene_params_t *p
 
 void scene_step(scene_t *s, float gx, float gy, float gz, float dt) {
     if (!s || !s->ready) return;
-    if (!(dt > 0.0f)) dt = 0.0f;   /* also catches NaN */
+    /* sc_finite first: clang folds `!(dt > 0) ? 0 : dt` into fmaxnm on arm64, which lets a signalling NaN through */
+    if (!sc_finite(dt) || !(dt > 0.0f)) dt = 0.0f;
     if (dt > 0.05f) dt = 0.05f;
     float in[3] = { gx, gy, gz };
     bool ok = sc_finite(gx) && sc_finite(gy) && sc_finite(gz);

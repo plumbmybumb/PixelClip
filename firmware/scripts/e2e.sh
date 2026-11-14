@@ -57,24 +57,78 @@ for f in gradient anim12 rsvp-dot-w; do
 done
 
 # ---------------------------------------------------------------- HTTP helpers
-# req METHOD PATH [curl args...]  ->  $CODE, body in $TMP/body (and $BODY for small bodies)
+# What the clip sends back is DATA, never code (security audit WIFI-7): the clip on the other end may be an
+# impostor with the published SSID and passphrase, or run someone else's firmware. So
+#   - a response never becomes part of a Python expression, of shell arithmetic or of a command: the expressions
+#     below are written here, and a value read from the clip that a check needs is handed to them as an
+#     argument (`a[0]`, `a[1]`, ...: plain strings), never pasted into their text;
+#   - a value kept in a shell variable is read with a typed reader (jint / jbool / jenum), which prints it only
+#     if it has exactly that shape and fails otherwise;
+#   - everything printed to the terminal is reduced to printable ASCII first (`clean`).
+# clean [MAX]  -> stdin on one line as printable ASCII (anything else becomes '?'), at most MAX characters (default 300)
+clean() { LC_ALL=C tr -d '\r' | LC_ALL=C tr '\n\t' '  ' | LC_ALL=C tr -c '\40-\176' '?' | head -c "${1:-300}" | sed -e 's/ *$//'; }
+# req METHOD PATH [curl args...]  ->  $CODE, body in $TMP/body (and $BODY: its first 2000 bytes, cleaned, for messages)
 req() {
     local method="$1" path="$2"; shift 2
     CODE=$(curl -sS -m 60 -H 'Expect:' -o "$TMP/body" -w '%{http_code}' -X "$method" "$CLIP$path" "$@" 2>"$TMP/curl.err")
-    [ -z "$CODE" ] && CODE=000
-    BODY=$(head -c 2000 "$TMP/body" 2>/dev/null || true)
+    [[ $CODE =~ ^[0-9]{3}$ ]] || CODE=000
+    BODY=$(head -c 2000 "$TMP/body" 2>/dev/null | clean 2000 || true)
 }
-# jget EXPR  -> evaluates a Python expression on the JSON body as `j` (prints the value)
-jget() { python3 -c 'import json,sys; j=json.load(open(sys.argv[1])); print(eval(sys.argv[2]))' "$TMP/body" "$1" 2>/dev/null; }
-# expect CODE DESCRIPTION [python-bool-expr on j]
+# The evaluator behind jget / jjson / jint / jbool / jenum: MODE BODY-FILE EXPR [ARGS...]. EXPR is an expression
+# written in this script; it sees the JSON body as `j` and ARGS as the list of strings `a`. No builtins that
+# import, open, execute or reflect (a second line of defence: nothing from the clip reaches EXPR anyway).
+cat >"$TMP/jq.py" <<'PY'
+import builtins, json, sys
+mode, path, expr, a = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:]
+SAFE = {n: getattr(builtins, n) for n in (
+    "abs", "all", "any", "bool", "bytes", "dict", "enumerate", "filter", "float", "frozenset", "int",
+    "isinstance", "len", "list", "map", "max", "min", "range", "reversed", "round", "set", "sorted", "str",
+    "sum", "tuple", "zip")}
+try:
+    with open(path, encoding="utf-8") as f:
+        j = json.load(f)
+    v = eval(expr, {"__builtins__": SAFE, "json": json, "j": j, "a": a})
+except Exception:
+    sys.exit(1)
+if mode == "json":                       # exact, ASCII only: for values handed back to a later check as an argument
+    out = json.dumps(v)
+elif mode == "int":                      # a JSON integer (not a bool, not a float, not a string)
+    if not isinstance(v, int) or isinstance(v, bool) or abs(v) >= 10 ** 15: sys.exit(1)
+    out = str(v)
+elif mode == "bool":
+    if not isinstance(v, bool): sys.exit(1)
+    out = str(v)
+elif mode == "enum":                     # a string that is one of ARGS
+    if not isinstance(v, str) or v not in a: sys.exit(1)
+    out = v
+else:                                    # "text": for comparisons with a literal and for messages
+    out = "".join(c if " " <= c <= "~" else "?" for c in str(v))[:2000]
+print(out)
+PY
+# jget EXPR [ARGS...]   -> the value as printable ASCII text (True / False for booleans), nothing if EXPR fails
+jget()  { local e="$1"; shift; python3 "$TMP/jq.py" text "$TMP/body" "$e" "$@" 2>/dev/null; }
+# jjson EXPR [ARGS...]  -> the value as JSON (ASCII)
+jjson() { local e="$1"; shift; python3 "$TMP/jq.py" json "$TMP/body" "$e" "$@" 2>/dev/null; }
+# jint EXPR / jbool EXPR / jenum EXPR CHOICE...  -> the value if it is an integer / True|False / one of the
+# choices; else nothing and a non-zero status. The shell checks the shape again before it prints.
+jint()  { local v; v=$(python3 "$TMP/jq.py" int "$TMP/body" "$1" 2>/dev/null) && [[ $v =~ ^-?(0|[1-9][0-9]{0,14})$ ]] && printf '%s\n' "$v"; }
+jbool() { local v; v=$(python3 "$TMP/jq.py" bool "$TMP/body" "$1" 2>/dev/null) && { [ "$v" = True ] || [ "$v" = False ]; } && printf '%s\n' "$v"; }
+jenum() {
+    local e="$1" v c; shift
+    v=$(python3 "$TMP/jq.py" enum "$TMP/body" "$e" "$@" 2>/dev/null) || return 1
+    for c in "$@"; do [ "$v" = "$c" ] && { printf '%s\n' "$v"; return 0; }; done
+    return 1
+}
+# expect CODE DESCRIPTION [python-bool-expr on j [ARGS...]]   (ARGS: the strings a[0], a[1], ... of the expression)
 expect() {
     local want="$1" desc="$2" expr="${3:-}"
+    if [ $# -ge 3 ]; then shift 3; else shift $#; fi
     if [ "$CODE" != "$want" ]; then
-        fail "$desc: HTTP $CODE (want $want) $(echo "$BODY" | head -c 200)$(cat "$TMP/curl.err" 2>/dev/null | head -c 200)"
+        fail "$desc: HTTP $CODE (want $want) $(printf '%s' "$BODY" | head -c 200)$(clean 200 <"$TMP/curl.err" 2>/dev/null)"
         return 1
     fi
-    if [ -n "$expr" ] && [ "$(jget "bool($expr)")" != "True" ]; then
-        fail "$desc: body check failed ($expr): $(echo "$BODY" | head -c 300)"
+    if [ -n "$expr" ] && [ "$(jget "bool($expr)" "$@")" != "True" ]; then
+        fail "$desc: body check failed ($expr): $(printf '%s' "$BODY" | head -c 300)"
         return 1
     fi
     pass "$desc"
@@ -180,11 +234,11 @@ echo "== crash diagnostics (GET/DELETE /coredump, /status.resets.coredump)"
 # DELETE /coredump once read). With no dump both GET and DELETE answer 404 no_coredump.
 req GET /status
 expect 200 "status.resets.coredump is a boolean" "isinstance(j['resets'].get('coredump'), bool)"
-CD_FLAG=$(jget "j['resets'].get('coredump')")
+CD_FLAG=$(jbool "j['resets'].get('coredump')") || CD_FLAG=invalid
 req GET /coredump -D "$TMP/coredump.hdr"
 if [ "$CODE" = 200 ]; then
     CD_SIZE=$(wc -c <"$TMP/body" | tr -d ' ')
-    CD_TYPE=$(tr -d '\r' <"$TMP/coredump.hdr" | awk -F': *' 'tolower($1)=="content-type"{t=$2} END{print t}')
+    CD_TYPE=$(tr -d '\r' <"$TMP/coredump.hdr" | awk -F': *' 'tolower($1)=="content-type"{t=$2} END{print t}' | clean 80)
     if [ "$CD_SIZE" -gt 0 ] && [ "${CD_TYPE%%;*}" = application/octet-stream ]; then
         pass "GET /coredump: 200 $CD_TYPE, $CD_SIZE B (the clip recorded a crash)"
     else
@@ -379,7 +433,7 @@ req POST /next
 # entry showing it, else the default (80 px/s left). In a screen-on session GET /screenshot is the live
 # frame, so two shots 300 ms apart differ; in a panel-off session it is the static offscreen render.
 req GET /status
-LIVE_S=$(jget "j['session'].get('display_on', True)")
+LIVE_S=$(jbool "j['session'].get('display_on', True)") || LIVE_S=True
 # moves: 0 if two screenshots 300 ms apart are identical, else 1
 moves() {
     req GET /screenshot; cp "$TMP/body" "$TMP/mv0"; sleep 0.3; req GET /screenshot
@@ -453,19 +507,94 @@ expect 200 "playlist back to gradient + anim12 + sand" "j['ok'] is True"
 
 echo "== config"
 req GET /config
-expect 200 "GET /config" "all(k in j for k in ('name','brightness','upload_timeout_s','ap_password','low_battery_pct','default_transition','tz_offset_s'))"
-ORIG_B=$(jget "j['brightness']"); ORIG_T=$(jget "j['default_transition']"); ORIG_TO=$(jget "j['upload_timeout_s']")
-NEW_B=$(( ORIG_B == 77 ? 78 : 77 )); NEW_T=$([ "$ORIG_T" = cut ] && echo fade || echo cut)
+expect 200 "GET /config" "all(k in j for k in ('name','brightness','upload_timeout_s','low_battery_pct','default_transition','tz_offset_s'))"
+# The hotspot passphrase is write-only (PROTOCOL §4): no answer of /config carries it.
+expect 200 "GET /config never contains ap_password" "'ap_password' not in j"
+# The values to restore later, each read with its type (the fallbacks only keep the script going after a FAIL).
+ORIG_B=$(jint "j['brightness']") || { fail "GET /config: brightness is not an integer"; ORIG_B=160; }
+ORIG_T=$(jenum "j['default_transition']" cut fade) || { fail "GET /config: default_transition is neither cut nor fade"; ORIG_T=fade; }
+ORIG_TO=$(jint "j['upload_timeout_s']") || { fail "GET /config: upload_timeout_s is not an integer"; ORIG_TO=120; }
+ORIG_LB=$(jint "j['low_battery_pct']") || { fail "GET /config: low_battery_pct is not an integer"; ORIG_LB=8; }
+if [ "$ORIG_B" = 77 ]; then NEW_B=78; else NEW_B=77; fi
+if [ "$ORIG_T" = cut ]; then NEW_T=fade; else NEW_T=cut; fi
 req PUT /config -H 'Content-Type: application/json' -d "{\"brightness\":$NEW_B,\"default_transition\":\"$NEW_T\",\"upload_timeout_s\":300}"
-expect 200 "PUT /config (partial merge) returns the full config" "j['brightness']==$NEW_B and j['default_transition']=='$NEW_T' and j['upload_timeout_s']==300 and 'ap_password' in j"
+expect 200 "PUT /config (partial merge) returns the config, without ap_password" \
+    "j['brightness']==int(a[0]) and j['default_transition']==a[1] and j['upload_timeout_s']==300 and 'ap_password' not in j" "$NEW_B" "$NEW_T"
 req GET /config
-expect 200 "GET /config shows the change" "j['brightness']==$NEW_B and j['default_transition']=='$NEW_T'"
+expect 200 "GET /config shows the change" "j['brightness']==int(a[0]) and j['default_transition']==a[1]" "$NEW_B" "$NEW_T"
 req GET /status
 expect 200 "session timeout follows upload_timeout_s" "j['session']['timeout_s']==300"
 req PUT /config -H 'Content-Type: application/json' -d '{"upload_timeout_s":5}'
 expect 422 "invalid config value -> 422" "j['error']=='invalid_config'"
 req PUT /config -H 'Content-Type: application/json' -d "{\"brightness\":$ORIG_B,\"default_transition\":\"$ORIG_T\",\"upload_timeout_s\":$ORIG_TO}"
-expect 200 "config restored" "j['brightness']==$ORIG_B and j['default_transition']=='$ORIG_T' and j['upload_timeout_s']==$ORIG_TO"
+expect 200 "config restored" "j['brightness']==int(a[0]) and j['default_transition']==a[1] and j['upload_timeout_s']==int(a[2])" "$ORIG_B" "$ORIG_T" "$ORIG_TO"
+# ap_password is still settable over WiFi (here: to the value the clip already has, so nothing changes) and is
+# validated, but it is never echoed. The body is built by json.dumps: the passphrase is the tester's own input.
+python3 -c 'import json,sys; print(json.dumps({"ap_password": sys.argv[1]}))' "$PASSPHRASE" >"$TMP/pw.json"
+req PUT /config -H 'Content-Type: application/json' --data-binary "@$TMP/pw.json"
+expect 200 "PUT /config ap_password (unchanged value) is accepted over WiFi and not echoed" "j['ok'] is True and 'ap_password' not in j"
+req PUT /config -H 'Content-Type: application/json' -d '{"ap_password":"short"}'
+expect 422 "ap_password shorter than 8 characters -> 422 invalid_config" "j['error']=='invalid_config'"
+# low_battery_pct is 0-20 (was 0-50: at 50 a single request switched the clip off below half charge).
+for v in 21 50 -1; do
+    req PUT /config -H 'Content-Type: application/json' -d "{\"low_battery_pct\":$v}"
+    expect 422 "low_battery_pct $v -> 422 invalid_config" "j['error']=='invalid_config'"
+done
+req PUT /config -H 'Content-Type: application/json' -d '{"low_battery_pct":20}'
+expect 200 "low_battery_pct 20 (the maximum) is accepted" "j['low_battery_pct']==20"
+req PUT /config -H 'Content-Type: application/json' -d "{\"low_battery_pct\":$ORIG_LB}"
+expect 200 "low_battery_pct restored" "j['low_battery_pct']==int(a[0])" "$ORIG_LB"
+
+echo "== request checks (PROTOCOL §4: Host, Origin, Content-Type; nesting depth)"
+# A web page in the phone's browser must not be able to drive the clip while the phone is on its hotspot.
+req GET /status -H 'Origin: http://evil.example'
+expect 403 "a request with an Origin header -> 403 cross_origin" "j['ok'] is False and j['error']=='cross_origin'"
+req POST /next -H 'Origin: null'
+expect 403 "POST /next with Origin: null -> 403 cross_origin (nothing ran)" "j['error']=='cross_origin'"
+req GET /status -H 'Sec-Fetch-Site: cross-site'
+expect 403 "Sec-Fetch-Site: cross-site -> 403 cross_origin" "j['error']=='cross_origin'"
+req GET /status -H 'Sec-Fetch-Site: none'
+expect 200 "Sec-Fetch-Site: none (typed into the address bar) is served" "j['ok'] is True"
+req GET /status -H 'Host: evil.example'
+expect 403 "a Host that is not the clip (DNS rebinding) -> 403 bad_host" "j['ok'] is False and j['error']=='bad_host'"
+req GET /status -H 'Host: 192.168.4.1.evil.example'
+expect 403 "a Host that only starts with the clip's address -> 403 bad_host" "j['error']=='bad_host'"
+req GET /status -H 'Host: pixelclip.local'
+expect 200 "Host: pixelclip.local is served" "j['ok'] is True"
+req GET /status -H 'Host: PixelClip.local:80'
+expect 200 "Host: PixelClip.local:80 (any case, port 80) is served" "j['ok'] is True"
+req GET /status -H 'Host:'
+expect 200 "a request without a Host header (HTTP/1.0 tools) is served" "j['ok'] is True"
+req POST /brightness -H 'Content-Type: text/plain' -d '{"value":121}'
+expect 415 "a JSON body sent as text/plain -> 415 unsupported_media_type" "j['ok'] is False and j['error']=='unsupported_media_type'"
+req POST /brightness -d '{"value":121}'
+expect 415 "a JSON body without a JSON Content-Type (curl -d: form-urlencoded) -> 415" "j['error']=='unsupported_media_type'"
+req PUT /playlist -H 'Content-Type: text/plain' -d "$PL"
+expect 415 "PUT /playlist as text/plain -> 415" "j['error']=='unsupported_media_type'"
+req POST /brightness -H 'Content-Type: application/json; charset=utf-8' -d '{"value":120}'
+expect 200 "application/json with a charset parameter is accepted" "j['ok'] is True"
+# JSON nested deeper than 16 levels is not JSON (the parser used to recurse 1000 levels deep on 8-10 KB stacks:
+# a crash, and with a stored playlist a crash at every boot).
+python3 - "$TMP" <<'PY'
+import sys
+tmp = sys.argv[1]
+open(tmp + "/deep-open.json", "w").write("[" * 200)                                   # never closed: the parser recursed before failing
+open(tmp + "/deep-1000.json", "w").write("[" * 1000 + "]" * 1000)
+for d in (16, 100):                                                                   # the root object is level 1
+    open(tmp + "/deep-pl-%d.json" % d, "w").write('{"version":1,"items":[],"x":' + "[" * d + "]" * d + "}")
+PY
+req POST /time -H 'Content-Type: application/json' --data-binary "@$TMP/deep-open.json"
+expect 400 "POST /time with 200 unclosed '[' -> 400 bad_json (no crash)" "j['error']=='bad_json'"
+req POST /brightness -H 'Content-Type: application/json' --data-binary "@$TMP/deep-1000.json"
+expect 400 "POST /brightness with JSON nested 1000 deep -> 400 bad_json" "j['error']=='bad_json'"
+for d in 16 100; do
+    req PUT /playlist -H 'Content-Type: application/json' --data-binary "@$TMP/deep-pl-$d.json"
+    expect 400 "PUT /playlist with an ignored key nested $d arrays deep (level $((d + 1))) -> 400 bad_json, not stored" "j['error']=='bad_json'"
+done
+req GET /playlist
+expect 200 "the stored playlist is untouched by the rejected documents" "len(j['items'])==3 and 'x' not in j"
+req GET /status
+expect 200 "the clip still answers after the deep documents" "j['ok'] is True and j['playlist']['count']==3"
 
 echo "== live controls"
 req POST /brightness -H 'Content-Type: application/json' -d '{"value":120}'
@@ -500,7 +629,7 @@ fi
 echo "== batlog"
 req GET /batlog
 if [ "$CODE" = 200 ] && head -n1 "$TMP/body" | grep -q ','; then
-    pass "GET /batlog: $(wc -l <"$TMP/body" | tr -d ' ') CSV lines (header: $(head -n1 "$TMP/body"))"
+    pass "GET /batlog: $(wc -l <"$TMP/body" | tr -d ' ') CSV lines (header: $(head -n1 "$TMP/body" | clean 120))"
 elif [ "$CODE" = 404 ]; then
     pass "GET /batlog -> 404 (optional endpoint not implemented)"
 else
@@ -523,36 +652,39 @@ neg() { [ "$1" = True ] && echo false || echo true; }      # Python bool -> nega
 req GET /config
 expect 200 "GET /config has display_during_upload / wifi_always_on / ble_wake (booleans)" \
     "all(isinstance(j.get(k), bool) for k in ('display_during_upload','wifi_always_on','ble_wake'))"
-O_DISP=$(jget "j['display_during_upload']"); O_AON=$(jget "j['wifi_always_on']"); O_BLE=$(jget "j['ble_wake']")
+O_DISP=$(jbool "j['display_during_upload']") || { fail "GET /config: display_during_upload is not a boolean"; O_DISP=True; }
+O_AON=$(jbool "j['wifi_always_on']") || { fail "GET /config: wifi_always_on is not a boolean"; O_AON=False; }
+O_BLE=$(jbool "j['ble_wake']") || { fail "GET /config: ble_wake is not a boolean"; O_BLE=True; }
 info "display_during_upload=$O_DISP wifi_always_on=$O_AON ble_wake=$O_BLE"
 req GET /status
 expect 200 "status.session has always_on / display_on (bools) and clients >= 1" \
     "isinstance(j['session'].get('always_on'), bool) and isinstance(j['session'].get('display_on'), bool) and j['session'].get('clients', 0) >= 1"
-LIVE=$(jget "j['session']['display_on']")
+LIVE=$(jbool "j['session']['display_on']") || { fail "status.session.display_on is not a boolean"; LIVE=True; }
+# In the checks below a[i]=='True' turns the saved True / False text back into a boolean.
 expect 200 "session.display_on == display_during_upload (or always-on), session.always_on == wifi_always_on" \
-    "j['session']['display_on'] == ($O_DISP or $O_AON) and j['session']['always_on'] == $O_AON"
+    "j['session']['display_on'] == (a[0]=='True' or a[1]=='True') and j['session']['always_on'] == (a[1]=='True')" "$O_DISP" "$O_AON"
 
 req PUT /config -H "$JH" -d "{\"display_during_upload\":$(neg "$O_DISP"),\"ble_wake\":$(neg "$O_BLE")}"
 expect 200 "PUT /config flips display_during_upload and ble_wake" \
-    "j['display_during_upload'] is not $O_DISP and j['ble_wake'] is not $O_BLE and j['wifi_always_on'] is $O_AON"
+    "j['display_during_upload'] is (a[0]!='True') and j['ble_wake'] is (a[1]!='True') and j['wifi_always_on'] is (a[2]=='True')" "$O_DISP" "$O_BLE" "$O_AON"
 req GET /config
-expect 200 "GET /config shows both flipped (persisted)" "j['display_during_upload'] is not $O_DISP and j['ble_wake'] is not $O_BLE"
+expect 200 "GET /config shows both flipped (persisted)" "j['display_during_upload'] is (a[0]!='True') and j['ble_wake'] is (a[1]!='True')" "$O_DISP" "$O_BLE"
 req GET /ble
-expect 200 "GET /ble follows ble_wake (enabled $(neg "$O_BLE"))" "j['ok'] is True and j['enabled'] is not $O_BLE"
+expect 200 "GET /ble follows ble_wake (enabled $(neg "$O_BLE"))" "j['ok'] is True and j['enabled'] is (a[0]!='True')" "$O_BLE"
 req GET /status
-expect 200 "display_during_upload does not change the running session (display_on still $LIVE)" "j['session']['display_on'] is $LIVE"
+expect 200 "display_during_upload does not change the running session (display_on still $LIVE)" "j['session']['display_on'] is (a[0]=='True')" "$LIVE"
 for bad in '"display_during_upload":"yes"' '"wifi_always_on":1' '"ble_wake":null'; do
     req PUT /config -H "$JH" -d "{$bad}"
     expect 422 "PUT /config {$bad} -> 422 invalid_config" "j['error']=='invalid_config'"
 done
 req PUT /config -H "$JH" -d "{\"display_during_upload\":$(pyb "$O_DISP"),\"ble_wake\":$(pyb "$O_BLE")}"
-expect 200 "display_during_upload / ble_wake restored" "j['display_during_upload'] is $O_DISP and j['ble_wake'] is $O_BLE"
+expect 200 "display_during_upload / ble_wake restored" "j['display_during_upload'] is (a[0]=='True') and j['ble_wake'] is (a[1]=='True')" "$O_DISP" "$O_BLE"
 
 req GET /ble
 expect 200 "GET /ble: enabled == ble_wake, name PixelClip-XXXX, service UUID from pixelclip_ble_uuids.h, connected bool" \
-    "j['ok'] is True and j['enabled'] is $O_BLE and j['name'].startswith('PixelClip-') and len(j['name'])==len('PixelClip-')+4 and j['service_uuid'].upper()=='$BLE_UUID' and isinstance(j['connected'], bool)"
+    "j['ok'] is True and j['enabled'] is (a[0]=='True') and j['name'].startswith('PixelClip-') and len(j['name'])==len('PixelClip-')+4 and j['service_uuid'].upper()==a[1] and isinstance(j['connected'], bool)" "$O_BLE" "$BLE_UUID"
 if [ "$SSID" != "(skipped)" ]; then
-    expect 200 "BLE name == SSID ($SSID)" "j['name']=='$SSID'"
+    expect 200 "BLE name == SSID ($SSID)" "j['name']==a[0]" "$SSID"
 fi
 
 req PUT /config -H "$JH" -d '{"wifi_always_on":true}'
@@ -565,9 +697,9 @@ sleep 2
 req GET /status
 expect 200 "session still answers 2 s after /session/end (always-on)" "j['session']['always_on'] is True"
 req PUT /config -H "$JH" -d "{\"wifi_always_on\":$(pyb "$O_AON")}"
-expect 200 "wifi_always_on restored ($O_AON)" "j['wifi_always_on'] is $O_AON"
+expect 200 "wifi_always_on restored ($O_AON)" "j['wifi_always_on'] is (a[0]=='True')" "$O_AON"
 req GET /status
-expect 200 "status.session.always_on back to $O_AON" "j['session']['always_on'] is $O_AON"
+expect 200 "status.session.always_on back to $O_AON" "j['session']['always_on'] is (a[0]=='True')" "$O_AON"
 
 # Live framebuffer: anim12 alone loops forever. In a screen-on session GET /screenshot is the frame on
 # the panel, so it changes between two screenshots; in a panel-off session it is the static offscreen
@@ -912,15 +1044,15 @@ for pair in "e2e-board:board" "e2e-board-49:board-49" "e2e-board-15:board-15" "e
     expect 201 "PUT /assets/${pair%%:*} (board sheet, atlas, $(wc -c <"$TMP/${pair#*:}.hca" | tr -d ' ') B)" "j['ok'] is True"
 done
 req GET /status
-BNOW=$(jget "j['time']['epoch']")
-BFUT=$(( ${BNOW:-0} + 3600 )); BPAST=$(( ${BNOW:-0} - 60 ))
+BNOW=$(jint "j['time']['epoch']") || { fail "status.time.epoch is not an integer"; BNOW=$(date +%s); }
+BFUT=$(( BNOW + 3600 )); BPAST=$(( BNOW - 60 ))
 BIT="{\"type\":\"board\",\"id\":\"e2e-board\",\"header\":0,\"empty\":1,\"rows\":[{\"frame\":2,\"until\":$BFUT},{\"frame\":3},{\"frame\":4,\"until\":$BPAST},{\"frame\":5,\"until\":null}],\"scroll_px_s\":16,\"duration_ms\":60000,\"transition\":\"fade\"}"
 BQ="{\"id\":\"e2e-qb\",\"at\":$AT,\"type\":\"board\",\"asset\":\"e2e-board\",\"rows\":[{\"frame\":2}],\"duration_ms\":30000}"
 req PUT /playlist -H "$JH" -d "{\"version\":1,\"items\":[$BIT],\"queue\":[$BQ]}"
 expect 200 "PUT /playlist with a board item (id = the sheet) and a board queue entry (asset = the sheet)" "j['ok'] is True"
 req GET /playlist
 expect 200 "GET /playlist round-trips the board" \
-    "j['items'][0]['id']=='e2e-board' and j['items'][0]['header']==0 and j['items'][0]['empty']==1 and [r['frame'] for r in j['items'][0]['rows']]==[2,3,4,5] and j['items'][0]['rows'][0]['until']==$BFUT and j['queue'][0]['asset']=='e2e-board'"
+    "j['items'][0]['id']=='e2e-board' and j['items'][0]['header']==0 and j['items'][0]['empty']==1 and [r['frame'] for r in j['items'][0]['rows']]==[2,3,4,5] and j['items'][0]['rows'][0]['until']==int(a[0]) and j['queue'][0]['asset']=='e2e-board'" "$BFUT"
 poll_status "j['playlist']['current']=='board:e2e-board'" 3
 expect 200 "board item playing -> playlist.current == board:e2e-board" "j['playlist']['current']=='board:e2e-board'"
 sleep 1
@@ -1034,10 +1166,10 @@ echo "== orientation (PROTOCOL §4 \"Orientation\")"
 # gravity says otherwise for 1 s, so the order flipped -> normal -> auto leaves a clip lying flat normal.
 req GET /config
 expect 200 "GET /config has orientation (auto|normal|flipped)" "j.get('orientation') in ('auto','normal','flipped')"
-O_ORIENT=$(jget "j['orientation']")
+O_ORIENT=$(jenum "j['orientation']" auto normal flipped) || { fail "GET /config: orientation is not auto, normal or flipped"; O_ORIENT=auto; }
 req GET /status
 expect 200 "status.orientation = {mode == config ($O_ORIENT), flipped: bool}" \
-    "j['orientation']['mode']=='$O_ORIENT' and isinstance(j['orientation']['flipped'], bool) and set(j['orientation'])=={'mode','flipped'}"
+    "j['orientation']['mode']==a[0] and isinstance(j['orientation']['flipped'], bool) and set(j['orientation'])=={'mode','flipped'}" "$O_ORIENT"
 for m in flipped normal auto; do
     case $m in flipped) F=True ;; normal) F=False ;; *) F=any ;; esac
     req PUT /config -H "$JH" -d "{\"orientation\":\"$m\"}"
@@ -1047,7 +1179,7 @@ for m in flipped normal auto; do
     req GET /status
     if [ "$F" = any ]; then
         expect 200 "status.orientation mode auto, flipped bool" "j['orientation']['mode']=='auto' and isinstance(j['orientation']['flipped'], bool)"
-        SF=$(jget "j['orientation']['flipped']")
+        SF=$(jbool "j['orientation']['flipped']") || SF=False
         info "auto: clip is $( [ "$SF" = True ] && echo flipped || echo normal ) now"
         req GET /imu
         expect 200 "GET /imu.flipped is a bool in auto" "isinstance(j.get('flipped'), bool)"
@@ -1064,7 +1196,7 @@ done
 req GET /config
 expect 200 "invalid orientation left the config alone (auto)" "j['orientation']=='auto'"
 req PUT /config -H "$JH" -d "{\"orientation\":\"$O_ORIENT\"}"
-expect 200 "orientation restored ($O_ORIENT)" "j['orientation']=='$O_ORIENT'"
+expect 200 "orientation restored ($O_ORIENT)" "j['orientation']==a[0]" "$O_ORIENT"
 
 echo "== imu"
 req GET /imu
@@ -1075,7 +1207,7 @@ if [ "$(jget "j['present']")" = "True" ]; then
 else
     info "IMU not present: scenes run with fixed downward gravity"
 fi
-IMU_PRESENT=$(jget "j['present']")
+IMU_PRESENT=$(jbool "j['present']") || IMU_PRESENT=False
 expect 200 "GET /imu reports calibrated + axis_map (3x3 signed permutation)" \
     "isinstance(j['calibrated'],bool) and len(j['axis_map'])==3 and all(sorted(abs(x) for x in r)==[0,0,1] for r in j['axis_map'])"
 info "axis map: $(jget "j['axis_map']") ($( [ "$(jget "j['calibrated']")" = True ] && echo 'bench calibration stored in NVS' || echo 'compiled map + Kconfig flips'))"
@@ -1439,13 +1571,13 @@ expect 200 "status.oracle at rest: {cards 4, waits, -1s, reading ''}; no mode / 
 # each, a screen without text skipped), detail A · B · C (card.<i>.brief; only for cards that have one), hold; POST
 # /oracle/turn = next, POST /oracle/back = previous. The walks keep every response's oracle fields, one JSON line each.
 # or_fw START-JSON: turn from the current screen until hold (bounded) -> $TMP/orfw.jsonl (START first)
-or_fields="json.dumps({k: j[k] for k in ('state','cards_drawn','card','page','reading')})"
+or_fields="{k: j[k] for k in ('state','cards_drawn','card','page','reading')}"
 or_fw() {
     printf '%s\n' "$1" > "$TMP/orfw.jsonl"; local n=0
     while [ $n -lt 20 ]; do
         req POST /oracle/turn; n=$((n + 1))
         [ "$CODE" = 200 ] || return 1
-        jget "$or_fields" >> "$TMP/orfw.jsonl"
+        jjson "$or_fields" >> "$TMP/orfw.jsonl"
         [ "$(jget "j['state']")" = hold ] && return 0
     done
     return 1
@@ -1456,10 +1588,10 @@ or_bw() {
     while [ $n -lt 20 ]; do
         req POST /oracle/back; n=$((n + 1))
         [ "$CODE" = 200 ] || return 1
-        jget "$or_fields" >> "$TMP/orbw.jsonl"
+        jjson "$or_fields" >> "$TMP/orbw.jsonl"
         if [ "$(jget "j['state']")" = waits ]; then
             req POST /oracle/back
-            [ "$CODE" = 200 ] && jget "$or_fields" >> "$TMP/orbw.jsonl"
+            [ "$CODE" = 200 ] && jjson "$or_fields" >> "$TMP/orbw.jsonl"
             return 0
         fi
     done
@@ -1471,7 +1603,7 @@ case "$CLIP" in *127.0.0.1*|*localhost*) ORMOCK=1 ;; *) ORMOCK=0 ;; esac
 # in order, card = that card, reading = its card.<i>.brief from BUNDLE-FILE, present exactly for the cards that have a
 # brief; the mock: all 5 lean screens), and the backward walk retraces it exactly, then waits twice
 or_walk() {
-    python3 - "$TMP/orfw.jsonl" "$TMP/orbw.jsonl" "$1" "$2" "$ORMOCK" <<'PY' 2>/dev/null || echo "False (walk check crashed)"
+    python3 - "$TMP/orfw.jsonl" "$TMP/orbw.jsonl" "$1" "$2" "$ORMOCK" <<'PY' 2>/dev/null | clean 400 | grep . || echo "False (walk check crashed)"
 import json, sys
 F = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
 B = [json.loads(l) for l in open(sys.argv[2]) if l.strip()]
@@ -1529,15 +1661,15 @@ if [ "${LIVE:-True}" = True ]; then
     expect 200 "POST /oracle/draw {cards:[2,0,3]} forces the row" "j['ok'] is True and j['state'] in ('shuffle','three')"
     poll_status "j['oracle']['state']=='three'" 5
     expect 200 "forced row: cards_drawn == [2,0,3]" "j['oracle']['cards_drawn']==[2,0,3]"
-    or_fw "$(jget "json.dumps(j['oracle'])")"
+    or_fw "$(jjson "j['oracle']")"
     expect 200 "forward walk with turns: three, lean screens, details 2 · 0 · 3, hold (the three, the paragraph)" \
         "j['state']=='hold' and j['cards_drawn']==[2,0,3] and j['card']==-1 and j['page']==-1 and len(j['reading'])>0"
     info "paragraph on three / hold: $(jget "len(j['reading'].encode('utf-8'))") B: $(jget "j['reading']" | head -c 140)..."
     or_bw
     ORW=$(or_walk "[2,0,3]" "$ORBUN")
     ORB1=$(python3 -c 'import json,sys; F=[json.loads(l) for l in open(sys.argv[1])]; B=[json.loads(l) for l in open(sys.argv[2])]; print(B[0]["state"]=="detail" and B[0]["page"]==2 and B[0]["card"]==3 and B[0]==F[-2])' "$TMP/orfw.jsonl" "$TMP/orbw.jsonl" 2>/dev/null || echo False)
-    expect 200 "back from hold -> detail C (card 3, its brief)" "$ORB1"
-    expect 200 "walks: ${ORW#* }" "${ORW%% *}"
+    expect 200 "back from hold -> detail C (card 3, its brief)" "a[0]=='True'" "$ORB1"
+    expect 200 "walks: ${ORW#* }" "a[0].split(' ')[0]=='True'" "$ORW"
     expect 200 "backward walk ends on waits; back on waits stays waits" "j['state']=='waits' and j['cards_drawn']==[-1,-1,-1]"
     req GET /status
     expect 200 "/status.oracle has exactly cards, state, cards_drawn, card, page, reading" \
@@ -1574,7 +1706,7 @@ if [ "${LIVE:-True}" = True ]; then
         ORSETS="$ORSETS $(jget "'-'.join(map(str, sorted(j['oracle']['cards_drawn'])))")"
     done
     ORREP=$(python3 -c 'import sys; s=sys.argv[1].split(); print(sum(1 for a, b in zip(s, s[1:]) if a == b) if len(s) == 10 and all(len(x.split("-")) == 3 for x in s) else -1)' "$ORSETS")
-    expect 200 "10 random draws in a row: never the previous draw's set ($ORSETS)" "$ORREP == 0"
+    expect 200 "10 random draws in a row: never the previous draw's set ($ORSETS)" "a[0]=='0'" "$ORREP"
     # a draw on a detail screen restarts from the draw
     for _ in $(seq 1 20); do
         req POST /oracle/turn
@@ -1620,10 +1752,10 @@ if [ "${LIVE:-True}" = True ]; then
     poll_status "j['playlist']['current']=='oracle:e2e-orb-nobr' and j['oracle']['state']=='waits'" 3
     req POST /oracle/draw -H "$JH" -d '{"cards":[3,1,0]}'
     poll_status "j['oracle']['state']=='three'" 5
-    or_fw "$(jget "json.dumps(j['oracle'])")"
+    or_fw "$(jjson "j['oracle']")"
     or_bw
     ORW=$(or_walk "[3,1,0]" "$TMP/orb-nobrief.txt")
-    expect 200 "no briefs: no detail screens; walks: ${ORW#* }" "${ORW%% *} and 'detail none' in '''$ORW'''"
+    expect 200 "no briefs: no detail screens; walks: ${ORW#* }" "a[0].split(' ')[0]=='True' and 'detail none' in a[0]" "$ORW"
     # cards 3: the only set there is, every time
     req POST /show/$ORB -H "$JH" -d "{\"type\":\"oracle\",\"deck\":\"e2e-ord-4f\",\"keys\":\"e2e-ork-3\",\"cards\":3,\"font\":\"e2e-orf\",\"hold_ms\":0,\"duration_ms\":120000}"
     expect 200 "POST /show/<bundle> with a 3-card oracle body (cards 3: the minimum; no notes)" "j['ok'] is True"
@@ -1675,17 +1807,17 @@ if [ "${LIVE:-True}" = True ]; then
         expect 200 "armed + shake -> deals (shuffle)" "j['state']=='shuffle'"
         poll_status "j['oracle']['state']=='three'" 5
         for step in three lean detail hold; do
-            if [ $step != three ]; then
+            if [ "$step" != three ]; then
                 for _ in $(seq 1 12); do
                     req POST /oracle/turn
-                    [ "$(jget "j['state']")" = $step ] && break
+                    [ "$(jget "j['state']")" = "$step" ] && break
                 done
             fi
             req GET /status
-            ORSKB=$(jget "(j['oracle']['state'], j['oracle']['page'], j['oracle']['card'], j['oracle']['cards_drawn'], j['oracle']['reading'])")
+            ORSKB=$(jjson "[j['oracle']['state'], j['oracle']['page'], j['oracle']['card'], j['oracle']['cards_drawn'], j['oracle']['reading']]")
             req POST /bench/shake -H "$JH" -d '{"g":2.0}'
             expect 200 "shake on $step: ignored (state, page, card, cards_drawn, reading unchanged)" \
-                "j['state']=='$step' and (j['state'], j['page'], j['card'], j['cards_drawn'], j['reading'])==$ORSKB"
+                "j['state']==a[0] and [j['state'], j['page'], j['card'], j['cards_drawn'], j['reading']]==json.loads(a[1])" "$step" "$ORSKB"
         done
         req POST /oracle/turn
         expect 200 "turn in hold -> waits" "j['state']=='waits'"
@@ -1711,7 +1843,8 @@ if [ "${LIVE:-True}" = True ]; then
     expect 200 "back at waits: the deferred end fires at once -> the rotation moves on to gradient" "j['playlist']['current']=='gradient'"
     # a queue entry due mid-draw waits for waits, then starts
     req GET /status
-    ORQAT=$(( $(jget "j['time']['epoch']") + 3 ))
+    ORQAT=$(jint "j['time']['epoch']") || { fail "status.time.epoch is not an integer"; ORQAT=$(date +%s); }
+    ORQAT=$(( ORQAT + 3 ))
     req PUT /playlist -H "$JH" -d "{\"version\":1,\"items\":[{\"type\":\"oracle\",\"id\":\"$ORB\",$ORA,\"hold_ms\":0}],\"queue\":[{\"id\":\"e2e-qdef\",\"at\":$ORQAT,\"type\":\"asset\",\"asset\":\"gradient\",\"duration_ms\":5000}]}"
     expect 200 "PUT /playlist: a lone oracle + a queue entry due in 3 s (clip clock)" "j['ok'] is True"
     poll_status "j['playlist']['current']=='oracle:$ORB'" 3

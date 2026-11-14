@@ -592,7 +592,8 @@ storage_status_t storage_asset_write_begin(const char *id, size_t total, storage
 {
     *out = NULL;
     if (!storage_id_valid(id) || total < HCA_HEADER_SIZE) return STORAGE_ERR_ARG;
-    if (free_bytes() < total + SPACE_MARGIN) return STORAGE_ERR_NO_SPACE;
+    const size_t free_b = free_bytes();   /* (total + SPACE_MARGIN wraps on a 32-bit size_t for a 4 GB Content-Length) */
+    if (total > free_b || free_b - total < SPACE_MARGIN) return STORAGE_ERR_NO_SPACE;
     lock();
     bool full = index_find_locked(id) < 0 && s_count >= STORAGE_MAX_ASSETS;
     unlock();

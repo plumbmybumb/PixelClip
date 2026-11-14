@@ -142,6 +142,11 @@ def selftest():
 
 # ----------------------------------------------------------------------------------------------- BLE
 
+def shown(s, limit=64):
+    """What a device says about itself (name, address), safe to print: printable ASCII only, no terminal escapes."""
+    return "".join(c if " " <= c <= "~" else "?" for c in str(s))[:limit]
+
+
 async def find_clip(BleakScanner, name, timeout):
     print(f"scanning {timeout:.0f} s for {name or 'PixelClip-*'} ...", file=sys.stderr)
     found = await BleakScanner.discover(timeout=timeout, return_adv=True)
@@ -155,7 +160,7 @@ async def find_clip(BleakScanner, name, timeout):
         return None
     cands.sort(key=lambda c: -c[0])
     rssi, n, dev = cands[0]
-    print(f"found {n} ({dev.address}, RSSI {rssi} dBm)", file=sys.stderr)
+    print(f"found {shown(n)} ({shown(dev.address)}, RSSI {rssi} dBm)", file=sys.stderr)
     return dev
 
 
@@ -225,7 +230,8 @@ async def run(a, body):
         try:
             print(json.dumps(json.loads(rbody), indent=2, ensure_ascii=False))
         except ValueError:
-            print(rbody.decode("utf-8", "replace"))
+            # not JSON: text from the device, shown without control characters (no terminal escapes)
+            print("".join(c if c in "\n\t" or (c >= " " and c != "\x7f") else "?" for c in rbody.decode("utf-8", "replace")))
     return 0 if 200 <= status < 300 else 1
 
 

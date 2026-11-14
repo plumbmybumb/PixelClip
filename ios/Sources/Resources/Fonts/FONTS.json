@@ -1,6 +1,7 @@
 {
   "generatedBy": "tools/fonts/fetch_fonts.py",
   "source": "https://github.com/google/fonts (ofl/)",
+  "commit": "cc39c4c2c304bc368c9b7c311ea2bcc6013299fe",
   "license": "SIL Open Font License 1.1 (OFL.txt in each family folder)",
   "totalBytes": 5956486,
   "families": [
@@ -16,7 +17,7 @@
       "files": [
         {
           "file": "PressStart2P/PressStart2P-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/pressstart2p/PressStart2P-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/pressstart2p/PressStart2P-Regular.ttf",
           "bytes": 118204,
           "sha256": "034c77f1f05ec89421e4a63f0e3a4ca1ecf852cc6d2bf611f126f275728e017d",
           "variable": false
@@ -45,14 +46,14 @@
       "files": [
         {
           "file": "Silkscreen/Silkscreen-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/silkscreen/Silkscreen-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/silkscreen/Silkscreen-Regular.ttf",
           "bytes": 32220,
           "sha256": "c845473330b94c2079ce9af01c51ac8ba2d99c24f4d14c039843bbb8e642ebd8",
           "variable": false
         },
         {
           "file": "Silkscreen/Silkscreen-Bold.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/silkscreen/Silkscreen-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/silkscreen/Silkscreen-Bold.ttf",
           "bytes": 30632,
           "sha256": "768476aa712d4f5c3e18d3bce80f980a8bd3f72b7094d22ec5e768df3acfed61",
           "variable": false
@@ -89,7 +90,7 @@
       "files": [
         {
           "file": "VT323/VT323-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/vt323/VT323-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/vt323/VT323-Regular.ttf",
           "bytes": 153116,
           "sha256": "cf4de751ada78ceac033dbe16a687742939995b77bc2a052ae17a4957958594d",
           "variable": false
@@ -118,7 +119,7 @@
       "files": [
         {
           "file": "DotGothic16/DotGothic16-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/dotgothic16/DotGothic16-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/dotgothic16/DotGothic16-Regular.ttf",
           "bytes": 2069236,
           "sha256": "3ad9af88726d42b40f7f365f0dcac785af73cf20ea6f1d5b44e57cc21150b8f1",
           "variable": false
@@ -147,7 +148,7 @@
       "files": [
         {
           "file": "PixelifySans/PixelifySans-VF.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/pixelifysans/PixelifySans[wght].ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/pixelifysans/PixelifySans[wght].ttf",
           "bytes": 79160,
           "sha256": "9ba86cd010a4de309d263ceff8e8044092c9db7efda869620cb9ff1c4389e8a5",
           "variable": true
@@ -200,7 +201,7 @@
       "files": [
         {
           "file": "Tiny5/Tiny5-VF.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/tiny5/Tiny5[BLED,JITT,ROND,wdth,wght].ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/tiny5/Tiny5[BLED,JITT,ROND,wdth,wght].ttf",
           "bytes": 433432,
           "sha256": "588626f2c1b164f55927c0d8123f4bc134651aad7d257da68fc19b0824b0d8fa",
           "variable": true
@@ -293,7 +294,7 @@
       "files": [
         {
           "file": "Bungee/Bungee-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/bungee/Bungee-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/bungee/Bungee-Regular.ttf",
           "bytes": 118996,
           "sha256": "c4f5361ce120af3e6b9156d0bf379fa19cda2ea0cd18ac01fd99596c6bf66e3f",
           "variable": false
@@ -322,7 +323,7 @@
       "files": [
         {
           "file": "Monoton/Monoton-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/monoton/Monoton-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/monoton/Monoton-Regular.ttf",
           "bytes": 51604,
           "sha256": "951c4cea65ffede784a7c9672feec5d329a7e1e12216c42d53ecf36c90d04dea",
           "variable": false
@@ -351,7 +352,7 @@
       "files": [
         {
           "file": "BebasNeue/BebasNeue-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/bebasneue/BebasNeue-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/bebasneue/BebasNeue-Regular.ttf",
           "bytes": 61400,
           "sha256": "08e4623805102d819f58601e46e345648846075e363b2ceb23313c2d1c83ec73",
           "variable": false
@@ -380,7 +381,7 @@
       "files": [
         {
           "file": "RubikMonoOne/RubikMonoOne-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/rubikmonoone/RubikMonoOne-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/rubikmonoone/RubikMonoOne-Regular.ttf",
           "bytes": 141088,
           "sha256": "b22624b6a36e543e942106edfccd198c50b57b65b924bfe02a6f0a5699429e6b",
           "variable": false
@@ -409,7 +410,7 @@
       "files": [
         {
           "file": "Righteous/Righteous-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/righteous/Righteous-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/righteous/Righteous-Regular.ttf",
           "bytes": 43104,
           "sha256": "2ffb3fe5c27d7e6571210b800448c4e234e651b46c6b4426c1bb567e5341348a",
           "variable": false
@@ -438,7 +439,7 @@
       "files": [
         {
           "file": "Orbitron/Orbitron-VF.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/orbitron/Orbitron[wght].ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/orbitron/Orbitron[wght].ttf",
           "bytes": 38576,
           "sha256": "f42db2dd16e642258e35782916eceb1dcdbea06fb958d77ad71dc5963587e8fd",
           "variable": true
@@ -507,7 +508,7 @@
       "files": [
         {
           "file": "Audiowide/Audiowide-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/audiowide/Audiowide-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/audiowide/Audiowide-Regular.ttf",
           "bytes": 69916,
           "sha256": "c7c0f2b0f6fad8c623e31772ce79f94a4edb9321ffce9fce978ea892d20ae730",
           "variable": false
@@ -536,7 +537,7 @@
       "files": [
         {
           "file": "UnicaOne/UnicaOne-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/unicaone/UnicaOne-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/unicaone/UnicaOne-Regular.ttf",
           "bytes": 71872,
           "sha256": "5d5861ae199cb69049e77e7cd08a8ffd6c14e90da19c8db8df0f4004ca93bd8f",
           "variable": false
@@ -565,7 +566,7 @@
       "files": [
         {
           "file": "AbrilFatface/AbrilFatface-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/abrilfatface/AbrilFatface-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/abrilfatface/AbrilFatface-Regular.ttf",
           "bytes": 67364,
           "sha256": "5971d4a3758a922a9fedc7f6fb825a96341a2e718c45a4b2c9a6b417c8c4dbe9",
           "variable": false
@@ -594,7 +595,7 @@
       "files": [
         {
           "file": "MajorMonoDisplay/MajorMonoDisplay-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/majormonodisplay/MajorMonoDisplay-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/majormonodisplay/MajorMonoDisplay-Regular.ttf",
           "bytes": 126788,
           "sha256": "3f2ee71c2b8464f065bf960a148be81d68fcc13385df87737928f948208dffc6",
           "variable": false
@@ -623,7 +624,7 @@
       "files": [
         {
           "file": "Pacifico/Pacifico-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/pacifico/Pacifico-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/pacifico/Pacifico-Regular.ttf",
           "bytes": 329380,
           "sha256": "5b6c0d5334a7bf77dea52b975c5a0c408878c0f7115ed5b6fb151f634b7bf701",
           "variable": false
@@ -652,7 +653,7 @@
       "files": [
         {
           "file": "Lobster/Lobster-Regular.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/lobster/Lobster-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/lobster/Lobster-Regular.ttf",
           "bytes": 406076,
           "sha256": "d6568e697fd50cedc0be04d8aae4127fe95add607e7bff954ca88604be80c205",
           "variable": false
@@ -681,7 +682,7 @@
       "files": [
         {
           "file": "DancingScript/DancingScript-VF.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/dancingscript/DancingScript[wght].ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/dancingscript/DancingScript[wght].ttf",
           "bytes": 133636,
           "sha256": "21808625578fe8d8cd10cb684be546dca077b27cd03a53a2f1ec11dc743c924c",
           "variable": true
@@ -734,7 +735,7 @@
       "files": [
         {
           "file": "Caveat/Caveat-VF.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/caveat/Caveat[wght].ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/caveat/Caveat[wght].ttf",
           "bytes": 403648,
           "sha256": "0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988",
           "variable": true
@@ -771,14 +772,14 @@
       "files": [
         {
           "file": "PlayfairDisplay/PlayfairDisplay-VF.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/PlayfairDisplay[wght].ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/playfairdisplay/PlayfairDisplay[wght].ttf",
           "bytes": 300724,
           "sha256": "c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6",
           "variable": true
         },
         {
           "file": "PlayfairDisplay/PlayfairDisplay-Italic-VF.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/PlayfairDisplay-Italic[wght].ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/playfairdisplay/PlayfairDisplay-Italic[wght].ttf",
           "bytes": 278688,
           "sha256": "a5e26dc5e2e77fb2803a0bf02fd4f81ee136ec8dea863ccdb0c59a263b21378b",
           "variable": true
@@ -895,7 +896,7 @@
       "files": [
         {
           "file": "SpaceGrotesk/SpaceGrotesk-VF.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/spacegrotesk/SpaceGrotesk[wght].ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/spacegrotesk/SpaceGrotesk[wght].ttf",
           "bytes": 136676,
           "sha256": "acad6de1fc93436f5c0f1f4137751ef04f1aea3063e7036535970ffcfbd79f72",
           "variable": true
@@ -948,7 +949,7 @@
       "files": [
         {
           "file": "Fredoka/Fredoka-VF.ttf",
-          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/fredoka/Fredoka[wdth,wght].ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/fredoka/Fredoka[wdth,wght].ttf",
           "bytes": 159184,
           "sha256": "2ba02e68b152868aef9ba28e24b3648c7d457fe6f25c761f2c2c53fb61a73fc8",
           "variable": true

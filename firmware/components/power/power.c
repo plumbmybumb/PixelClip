@@ -29,7 +29,7 @@
 
 static const char *TAG = "power";
 
-#define BAT_ADC_GPIO    CONFIG_HAIRCLIP_BAT_ADC_GPIO   /* Kconfig: 1 on the Waveshare board, 4 on the LilyGo */
+#define BAT_ADC_GPIO    CONFIG_PIXELCLIP_BAT_ADC_GPIO   /* Kconfig: 1 on the Waveshare board, 4 on the LilyGo */
 #define BAT_ADC_ATTEN   ADC_ATTEN_DB_12
 #define AVG_N           4
 #define HARD_FLOOR_MV   3400            /* HARDWARE.md §8: deep-sleep at 3.40 V, before the pack PCM cuts */
@@ -225,7 +225,7 @@ static bool update_usb(int inst)
     return changed;
 }
 
-/* Averaged sample (every CONFIG_HAIRCLIP_BATTERY_SAMPLE_S). */
+/* Averaged sample (every CONFIG_PIXELCLIP_BATTERY_SAMPLE_S). */
 static void sample(int mv)
 {
     if (mv < MIN_PLAUSIBLE_MV) {
@@ -312,7 +312,7 @@ static void power_task(void *arg)
             sample(inst >= MIN_PLAUSIBLE_MV ? inst : read_battery_mv());
             continue;
         }
-        if (tick % CONFIG_HAIRCLIP_BATTERY_SAMPLE_S != 0) continue;
+        if (tick % CONFIG_PIXELCLIP_BATTERY_SAMPLE_S != 0) continue;
 
         sample(inst >= MIN_PLAUSIBLE_MV ? inst : read_battery_mv());
         power_battery_t b;
@@ -416,9 +416,9 @@ esp_err_t power_init(power_event_cb_t cb)
     /* Light sleep is enabled only now: the first USB evaluation above has already taken the USB hold if a host
      * or charger is there, so a USB-powered clip never light-sleeps, not even between here and the first tick. */
     esp_pm_config_t pm = {
-        .max_freq_mhz = CONFIG_HAIRCLIP_CPU_MAX_MHZ,
-        .min_freq_mhz = CONFIG_HAIRCLIP_CPU_MIN_MHZ,
-#if CONFIG_HAIRCLIP_AUTO_LIGHT_SLEEP
+        .max_freq_mhz = CONFIG_PIXELCLIP_CPU_MAX_MHZ,
+        .min_freq_mhz = CONFIG_PIXELCLIP_CPU_MIN_MHZ,
+#if CONFIG_PIXELCLIP_AUTO_LIGHT_SLEEP
         .light_sleep_enable = true,
 #else
         .light_sleep_enable = false,

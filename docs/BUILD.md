@@ -26,6 +26,18 @@ switches with the lid on.
 
 Where this guide says **Not documented**, the project's notes are silent. Make your own call, carefully.
 
+## Read this before you connect a cell
+
+> [!WARNING]
+> **USB charges the cell whenever both are connected.** The board's charger is hardware: any time a USB cable is
+> plugged in while the cell is connected, it charges the cell. Software cannot switch this off. With the board's
+> original R1 the charge current is about 1 A by the project's calculation (never measured), twice the 500 mAh
+> cell's 0.5 A rating. **Until R1 is changed (step 9), unplug the cell before every USB connection**, including
+> flashing, the serial monitor and the scripts in `firmware/scripts/`.
+
+The steps below are ordered so the cell is first connected only after R1 has been changed and with USB unplugged
+(steps 9 and 12).
+
 ---
 
 ## Part 1: check and flash the board
@@ -42,6 +54,11 @@ firmware check over USB while its screen never lit. Find that out before you cut
 
 Follow Espressif's [getting-started guide for v5.5](https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32s3/get-started/index.html).
 The repository's commands assume it lives in `~/esp/esp-idf`.
+
+Use the `v5.5` release tag (ESP-IDF 5.5.0, the version recorded in
+[`../firmware/dependencies.lock`](../firmware/dependencies.lock)), for example
+`git clone -b v5.5 --recursive https://github.com/espressif/esp-idf.git ~/esp/esp-idf`. The component manifest
+accepts newer versions, but 5.5.0 is the one the lock file records.
 
 ### 3. Build and flash the firmware
 
@@ -71,8 +88,11 @@ screen**: it should show the idle screen ("Send me something" with a sparkle).
 ### 5. Find BOOT and RESET
 
 The two side buttons sit near the USB end, one on each long edge. Check the silkscreen: the schematic calls BOOT
-`B1` and RESET `R10`. With the picture upright and the USB end on the right, BOOT is top-right and RESET is
-bottom-right.
+`B1` and RESET `R10`. This guide places BOOT top-right and RESET bottom-right, with the picture upright and the
+USB end on the right, but the board's CAD model cannot tell the two switches apart
+([`MECHANICAL.md`](MECHANICAL.md) §5 marks it **UNCONFIRMED**). Confirm it on your board: with `idf.py monitor`
+running (no cell connected yet), press one button briefly. RESET restarts the chip and the monitor shows a fresh
+boot log; a short press on BOOT does not.
 
 - **BOOT** is the only button the software reads. Short press: next item. Long press (1.5 to 6 s): open the
   WiFi hotspot. Hold 6 s or more: power off. Double taps and a few special cases (reader, tarot) are in
@@ -120,20 +140,26 @@ The board's PL4054 charger has its charge current set by R1 on its PROG pin. R1 
 1 A: twice the 500 mAh cell's 0.5 A rating. Replace it with a 4.7 kΩ 0603 resistor for about 210 mA (about 0.4 C,
 roughly 2.7 h for a full charge).
 
-- **Status:** required before you charge a cell this small from the board. **Computed, not measured:** the
-  1000 / R(kΩ) relation is confirmed for other 4054-family chargers, not for the PL4054 (its datasheet was not
-  found), and the reference build's records do not show the swap being done.
+- **Status:** required before the cell is ever connected while USB is plugged in. "Charging from the board" is not
+  a separate act: the charger runs by itself whenever both are connected (see the warning below). **Computed, not
+  measured:** the 1000 / R(kΩ) relation is confirmed for other 4054-family chargers, not for the PL4054 (its
+  datasheet was not found), and the reference build's records do not show the swap being done.
 - **Not documented:** where R1 sits on the physical board. Find it from Waveshare's schematic (linked in
   [`HARDWARE.md`](HARDWARE.md), "Sources") at the charger's PROG pin, and confirm it measures about 1 kΩ before
   you lift it.
 - If you have an inline USB power meter, measure the charge current with a partly discharged cell attached.
-- Until R1 is changed, do not charge the cell from the board. Charge it with a separate LiPo charger at no more
-  than 0.5 C (250 mA for 500 mAh).
+- Until R1 is changed, charge the cell only with a separate LiPo charger at no more than 0.5 C (250 mA for
+  500 mAh).
+
+> [!WARNING]
+> Any time USB is connected while the cell is plugged in, the board charges the cell, and software cannot switch
+> this off. If you leave this step for later, unplug the cell before every USB connection, including flashing,
+> until R1 is changed. Once the case is closed that means opening it first.
 
 ### 10. Re-check the board
 
-Plug it in again and run `NOFLASH=1 firmware/scripts/flash.sh` (reset and capture only). Expect `RESULT: PASS`
-and a lit screen, as in step 4. The reference board was checked the same way after it was stripped.
+Plug USB in again (still no cell connected) and run `NOFLASH=1 firmware/scripts/flash.sh` (reset and capture
+only). Expect `RESULT: PASS` and a lit screen, as in step 4. The reference board was checked the same way after it was stripped.
 
 ---
 
@@ -157,8 +183,12 @@ orders, and the board's pin 1 is not marked.
 
 1. Check the cell has its own protection circuit (the listing or datasheet should say so). The board has no
    battery protection.
-2. Plug the cell into the board's battery header.
-3. Unplug USB. The clip keeps running from the cell.
+2. Unplug USB from the board.
+3. Plug the cell into the board's battery header. The clip starts and runs from the cell.
+
+> [!WARNING]
+> From here on, plugging in USB charges the cell. If R1 is still the original 1 kΩ (step 9 not done), unplug the
+> cell before every USB connection, including flashing and any of the scripts in `firmware/scripts/`.
 
 There is no power switch: as soon as the cell is connected the board draws power. "Off" is the firmware's deep
 sleep (hold BOOT 6 s), which still draws a little.
@@ -278,8 +308,10 @@ the wrong way" in the app; it stores a correction on the clip.
 
 ## Charging and everyday care
 
-**Charging.** Only after step 9. Plug a USB-C cable into the cove at the end of the clip; the plug's moulded head
-fits into the cove. The clip keeps running while it charges. A red LED on the board is driven by the charger
+**Charging.** Only after step 9. Any USB connection with the cell plugged in is a charge, whatever you plugged in
+for; until R1 is changed, unplug the cell first (see "Read this before you connect a cell"). Plug a USB-C cable
+into the cove at the end of the clip; the plug's moulded head fits into the cove. The clip keeps running while it
+charges. A red LED on the board is driven by the charger
 itself, not by the software (it may not show through the case). The battery level the app reports is not
 meaningful while USB is plugged in, because the battery line then sits at the charger's voltage.
 
@@ -287,7 +319,8 @@ meaningful while USB is plugged in, because the battery line then sits at the ch
 
 **Low battery.** At about 8 % (about 3.66 V) the clip shows "Battery low" for 10 s and goes to sleep; it also
 sleeps below 3.40 V, before the cell's own protection would cut it off abruptly. WiFi sessions are refused below
-3.5 V.
+3.5 V. The percentage is on the firmware's own scale, where 0 % is 3.40 V (`firmware/components/power/power.c`),
+and 8 % is the default of the `low_battery_pct` setting.
 
 **"Battery trouble / check the plug".** The firmware shows this and sleeps after five short battery runs in a row
 that ended in power-loss restarts. Open the case and check the battery plug and lead. During development one
@@ -303,12 +336,14 @@ months (an estimate). For long storage, open the case and unplug the cell.
 
 ## Safety
 
-A small LiPo cell worn on the head is safe when treated with care. Please do:
+A LiPo cell worn on the head needs care, and parts of this build were never measured (see "What has and has not
+been tested"), including the charge current after the R1 change. At the least:
 
 - **Use a protected cell.** The board has no battery protection of its own.
 - **Check polarity with a meter** on every new cell before plugging it in.
-- **Change R1 before charging from the board**, and confirm the current if you can. Unmodified, the board charges
-  at about twice this cell's rating.
+- **Change R1 before the cell and USB are ever connected together**, and confirm the current if you can.
+  Unmodified, the board charges at about twice this cell's rating, and it charges whenever USB and the cell are
+  both connected; software cannot stop it.
 - **Do not charge unattended**, and do not charge while the clip is in your hair.
 - **Never bend, pierce or clamp the cell.** Keep clip springs and glue off it. Stop using a cell that has swollen,
   been punctured or got hot.
@@ -322,7 +357,7 @@ A small LiPo cell worn on the head is safe when treated with care. Please do:
 
 | Symptom | Try |
 |---|---|
-| No `/dev/cu.usbmodem*` port | Hold BOOT, tap RESET, release BOOT, then flash. Check the cable carries data. |
+| No `/dev/cu.usbmodem*` port | Hold BOOT, tap RESET, release BOOT, then flash. Check the cable carries data. (Unplug the cell first if R1 is unchanged.) |
 | Dark screen right after flashing | The chip may still be in download mode: press RESET. |
 | `PASS` but the screen stays dark | The panel may be faulty; see step 1. |
 | A key does nothing | Check the key moves freely; try the looser key B. |

@@ -7,6 +7,17 @@ public enum HTMLText {
 
     // MARK: DOM
 
+    /// Limits that keep a hostile page from costing more than a slow import (a browser's own parser
+    /// stops nesting at 512 levels too; real articles are a few hundred KB and tens of thousands of nodes).
+    public enum Limits {
+        /// Bytes of HTML read; the rest of a longer document is ignored.
+        public static let maxInputBytes = 12 << 20
+        /// Open elements. Deeper ones become children of the deepest kept element.
+        public static let maxDepth = 512
+        /// Elements and text nodes created; parsing stops there.
+        public static let maxNodes = 400_000
+    }
+
     final class Node {
         let name: String            // lower-case tag, "" for text
         var attrs: [String: String]
@@ -15,6 +26,12 @@ public enum HTMLText {
         weak var parent: Node?
         var score: Double = 0
         var scored = false
+        /// Taken out by `detach()`; `sweep()` drops it from its former parent's children.
+        var removed = false
+        var needsSweep = false
+        /// Text statistics of the subtree, filled by `HTMLText.measure`: non-blank characters, words,
+        /// commas, and the summed `textLength` of every `<a>` below.
+        var textChars = 0, textTokens = 0, commas = 0, linkLength = 0
 
         init(name: String, attrs: [String: String] = [:], text: String = "") {
             self.name = name; self.attrs = attrs; self.text = text
@@ -24,9 +41,18 @@ public enum HTMLText {
 
         func append(_ n: Node) { n.parent = self; children.append(n) }
 
-        func remove() {
-            parent?.children.removeAll { $0 === self }
+        /// Takes this node out of the tree. The parent's child list is cleaned once, by `sweep()`
+        /// (removing each node from the array as it goes was quadratic in the number of siblings).
+        func detach(_ dirty: inout [Node]) {
+            guard let p = parent else { return }
+            removed = true
             parent = nil
+            if !p.needsSweep { p.needsSweep = true; dirty.append(p) }
+        }
+
+        func sweep() {
+            children.removeAll { $0.removed }
+            needsSweep = false
         }
 
         /// Every element below (pre-order).
@@ -41,22 +67,71 @@ public enum HTMLText {
             return out
         }
 
-        func first(_ tag: String) -> Node? { elements().first { $0.name == tag } }
+        /// The first element below (pre-order) that satisfies `match`, looking at no more than `maxNodes` nodes.
+        func firstElement(maxNodes: Int = .max, where match: (Node) -> Bool) -> Node? {
+            var stack = Array(children.reversed())
+            var seen = 0
+            while let n = stack.popLast() {
+                seen += 1
+                if seen > maxNodes { return nil }
+                guard !n.isText else { continue }
+                if match(n) { return n }
+                stack.append(contentsOf: n.children.reversed())
+            }
+            return nil
+        }
 
-        /// Raw text below, whitespace collapsed.
-        var innerText: String {
+        func first(_ tag: String) -> Node? { firstElement { $0.name == tag } }
+
+        /// Raw text below, whitespace collapsed. `maxNodes` bounds the walk (labels only need the start).
+        func innerText(maxNodes: Int) -> String {
             var s = ""
-            collect(&s)
+            var stack: [Node] = [self]
+            var seen = 0
+            while let n = stack.popLast() {
+                seen += 1
+                if seen > maxNodes { break }
+                if n.isText { s += n.text; s += " "; continue }
+                if n.name == "br" { s += " " }
+                stack.append(contentsOf: n.children.reversed())
+            }
             return s.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
         }
 
-        private func collect(_ s: inout String) {
-            if isText { s += text; s += " "; return }
-            if name == "br" { s += " " }
-            for c in children { c.collect(&s) }
-        }
+        var innerText: String { innerText(maxNodes: .max) }
+
+        /// `innerText.count` without building the text (after `HTMLText.measure`).
+        var textLength: Int { textChars + max(0, textTokens - 1) }
 
         var classAndID: String { ((attrs["class"] ?? "") + " " + (attrs["id"] ?? "")).lowercased() }
+    }
+
+    /// Fills the text statistics of `root` and everything below it, bottom-up in one pass, so the
+    /// scoring never re-reads a subtree per candidate.
+    static func measure(_ root: Node) {
+        var work: [(node: Node, done: Bool)] = [(root, false)]
+        while let (n, done) = work.popLast() {
+            if n.isText {
+                var tokens = 0, chars = 0, commas = 0, inToken = false
+                for ch in n.text {
+                    if ch.isWhitespace { inToken = false; continue }
+                    if !inToken { tokens += 1; inToken = true }
+                    chars += 1
+                    if ch == "," || ch == "，" || ch == "、" { commas += 1 }
+                }
+                n.textChars = chars; n.textTokens = tokens; n.commas = commas; n.linkLength = 0
+            } else if !done {
+                work.append((n, true))
+                for c in n.children { work.append((c, false)) }
+            } else {
+                var chars = 0, tokens = 0, commas = 0, links = 0
+                for c in n.children {
+                    chars += c.textChars; tokens += c.textTokens; commas += c.commas
+                    links += c.linkLength + (c.name == "a" ? c.textLength : 0)
+                }
+                n.textChars = chars; n.textTokens = tokens; n.commas = commas; n.linkLength = links
+            }
+        }
     }
 
     static let voidTags: Set<String> = ["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param",
@@ -71,11 +146,18 @@ public enum HTMLText {
                                        "h4", "h5", "h6", "ul", "ol", "dl", "blockquote", "pre", "figure", "table", "address", "hr",
                                        "form", "fieldset", "details", "center", "hgroup"]
 
-    /// Parses into a tree rooted at a synthetic `#document` node.
+    /// Parses into a tree rooted at a synthetic `#document` node. Linear in the input: the open
+    /// elements are indexed by tag, so no end tag or implied end tag scans the stack; nesting, node count
+    /// and input size are bounded by `Limits`.
     static func parse(_ html: String) -> Node {
         let root = Node(name: "#document")
         var stack: [Node] = [root]
-        let b = Array(html.utf8)
+        /// Tag → the positions in `stack` of its open elements, ascending.
+        var openAt: [String: [Int]] = [:]
+        /// Elements opened past `Limits.maxDepth`: not on the stack, so their end tags are swallowed here.
+        var overflow = 0
+        var nodes = 0
+        let b = Array(html.utf8.prefix(Limits.maxInputBytes))
         let n = b.count
         var i = 0
         var textStart = 0
@@ -84,41 +166,56 @@ public enum HTMLText {
         func flushText(_ upTo: Int) {
             if upTo > textStart {
                 let t = str(textStart, upTo)
-                if !t.isEmpty { stack.last!.append(Node(name: "", text: decodeEntities(t))) }
+                if !t.isEmpty { stack.last!.append(Node(name: "", text: decodeEntities(t))); nodes += 1 }
             }
         }
         func lower(_ c: UInt8) -> UInt8 { (c >= 65 && c <= 90) ? c + 32 : c }
         func isNameChar(_ c: UInt8) -> Bool { (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 45 || c == 58 || c == 95 }
-        func startsWith(_ s: String, at k: Int) -> Bool {
-            let u = Array(s.utf8)
+        func startsWith(_ u: [UInt8], at k: Int) -> Bool {
             guard k + u.count <= n else { return false }
             for (j, c) in u.enumerated() where lower(b[k + j]) != c { return false }
             return true
         }
         func find(_ s: String, from k: Int) -> Int? {
+            let u = Array(s.utf8)
             var j = k
-            let first = s.utf8.first!
+            let first = u[0]
             while j < n {
-                if lower(b[j]) == first, startsWith(s, at: j) { return j }
+                if lower(b[j]) == first, startsWith(u, at: j) { return j }
                 j += 1
             }
             return nil
         }
-        func closeTo(_ tag: String) {
-            guard let idx = stack.lastIndex(where: { $0.name == tag }), idx > 0 else { return }
-            stack.removeSubrange(idx...)
+        func push(_ node: Node) {
+            openAt[node.name, default: []].append(stack.count)
+            stack.append(node)
         }
+        /// Closes every open element from position `idx` up.
+        func pop(to idx: Int) {
+            while stack.count > idx {
+                let top = stack.removeLast()
+                openAt[top.name]?.removeLast()
+            }
+        }
+        /// The innermost open element with one of these tags.
+        func lastOpen(_ names: [String]) -> Int? { names.compactMap { openAt[$0]?.last }.max() }
+        func closeTo(_ tag: String) {
+            guard let idx = openAt[tag]?.last, idx > 0 else { return }
+            pop(to: idx)
+        }
+        let comment = Array("<!--".utf8), cdata = Array("<![cdata[".utf8)
 
-        while i < n {
+        while i < n, nodes < Limits.maxNodes {
             guard b[i] == 0x3C, i + 1 < n else { i += 1; continue }   // '<'
             let c = b[i + 1]
             if c == 0x21 {   // <!
                 flushText(i)
-                if startsWith("<!--", at: i) {
+                if startsWith(comment, at: i) {
                     i = (find("-->", from: i + 4).map { $0 + 3 }) ?? n
-                } else if startsWith("<![cdata[", at: i) {
+                } else if startsWith(cdata, at: i) {
                     let end = find("]]>", from: i + 9) ?? n
                     stack.last!.append(Node(name: "", text: str(i + 9, end)))
+                    nodes += 1
                     i = min(n, end + 3)
                 } else {
                     i = (find(">", from: i).map { $0 + 1 }) ?? n
@@ -173,34 +270,38 @@ public enum HTMLText {
             i = min(n, j + 1)
             textStart = i
             if closing {
-                if name == "p", !stack.contains(where: { $0.name == "p" }) { continue }
-                closeTo(name)
+                if overflow > 0 { overflow -= 1; continue }
+                closeTo(name)   // an end tag with nothing open to match (a stray </p>) does nothing
                 continue
             }
             // Implied end tags.
-            if closesP.contains(name), stack.last?.name == "p" { stack.removeLast() }
-            if name == "li", let k = stack.lastIndex(where: { ["li", "ul", "ol"].contains($0.name) }), stack[k].name == "li" { stack.removeSubrange(k...) }
-            if ["dt", "dd"].contains(name), let k = stack.lastIndex(where: { ["dt", "dd", "dl"].contains($0.name) }), stack[k].name != "dl" { stack.removeSubrange(k...) }
-            if ["td", "th"].contains(name), let k = stack.lastIndex(where: { ["td", "th", "tr", "table"].contains($0.name) }),
-               ["td", "th"].contains(stack[k].name) { stack.removeSubrange(k...) }
-            if name == "tr", let k = stack.lastIndex(where: { ["tr", "table"].contains($0.name) }), stack[k].name == "tr" { stack.removeSubrange(k...) }
-            if name == "option", stack.last?.name == "option" { stack.removeLast() }
+            if closesP.contains(name), stack.last?.name == "p" { pop(to: stack.count - 1) }
+            if name == "li", let k = lastOpen(["li", "ul", "ol"]), stack[k].name == "li" { pop(to: k) }
+            if name == "dt" || name == "dd", let k = lastOpen(["dt", "dd", "dl"]), stack[k].name != "dl" { pop(to: k) }
+            if name == "td" || name == "th", let k = lastOpen(["td", "th", "tr", "table"]),
+               stack[k].name == "td" || stack[k].name == "th" { pop(to: k) }
+            if name == "tr", let k = lastOpen(["tr", "table"]), stack[k].name == "tr" { pop(to: k) }
+            if name == "option", stack.last?.name == "option" { pop(to: stack.count - 1) }
             let node = Node(name: name, attrs: attrs)
             stack.last!.append(node)
+            nodes += 1
             if voidTags.contains(name) || selfClosing { continue }
             if rawTextTags.contains(name) {
                 let end = find("</\(name)", from: i) ?? n
                 if end > i {
                     let raw = str(i, end)
                     node.append(Node(name: "", text: name == "title" || name == "textarea" ? decodeEntities(raw) : raw))
+                    nodes += 1
                 }
                 i = (find(">", from: end).map { $0 + 1 }) ?? n
                 textStart = i
                 continue
             }
-            stack.append(node)
+            // Too deep to nest further: it stays a child of the deepest element, and so does what it holds.
+            if stack.count >= Limits.maxDepth { overflow += 1; continue }
+            push(node)
         }
-        flushText(n)
+        if nodes < Limits.maxNodes { flushText(n) }
         return root
     }
 
@@ -291,9 +392,12 @@ public enum HTMLText {
             if !t.isEmpty { paras.append(t) }
             cur = ""
         }
-        func walk(_ n: Node, pre: Bool) {
+        // An explicit stack instead of recursion: the depth of a page never reaches the call stack.
+        var work: [(node: Node, pre: Bool, closesBlock: Bool)] = [(node, false, false)]
+        while let (n, pre, closesBlock) = work.popLast() {
+            if closesBlock { flush(); continue }
             if n.isText {
-                if pre { cur += n.text; return }
+                if pre { cur += n.text; continue }
                 var collapsed = ""
                 var lastSpace = cur.last.map { $0 == " " || $0 == "\n" } ?? true
                 for ch in n.text {
@@ -304,27 +408,26 @@ public enum HTMLText {
                     }
                 }
                 cur += collapsed
-                return
+                continue
             }
             switch n.name {
             case "script", "style", "noscript", "template", "head", "title", "svg", "math", "iframe", "button", "select",
                  "textarea", "input", "img", "video", "audio", "canvas", "object", "embed", "rt", "rp":
-                return
+                continue
             case "br":
                 cur += "\n"
-                return
+                continue
             case "hr":
                 flush()
-                return
+                continue
             default: break
             }
-            if skipHeadings, ["h1", "h2", "h3", "h4", "h5", "h6"].contains(n.name) { return }
+            if skipHeadings, ["h1", "h2", "h3", "h4", "h5", "h6"].contains(n.name) { continue }
             let block = blockTags.contains(n.name)
-            if block { flush() }
-            for c in n.children { walk(c, pre: pre || n.name == "pre") }
-            if block { flush() }
+            if block { flush(); work.append((n, pre, true)) }
+            let inPre = pre || n.name == "pre"
+            for c in n.children.reversed() { work.append((c, inPre, false)) }
         }
-        walk(node, pre: false)
         flush()
         return paras
     }
@@ -337,8 +440,9 @@ public enum HTMLText {
     }
 
     /// The first heading's text (EPUB chapter names).
-    public static func firstHeading(_ html: String) -> String? {
-        let doc = parse(html)
+    public static func firstHeading(_ html: String) -> String? { firstHeading(in: parse(html)) }
+
+    static func firstHeading(in doc: Node) -> String? {
         for tag in ["h1", "h2", "h3"] {
             if let h = doc.first(tag)?.innerText, !h.isEmpty { return h }
         }
@@ -382,11 +486,11 @@ public enum HTMLText {
         return w
     }
 
+    /// The share of a node's text that sits in links (after `measure`).
     static func linkDensity(_ n: Node) -> Double {
-        let total = n.innerText.count
+        let total = n.textLength
         guard total > 0 else { return 0 }
-        let links = n.elements().filter { $0.name == "a" }.reduce(0) { $0 + $1.innerText.count }
-        return min(1, Double(links) / Double(total))
+        return min(1, Double(n.linkLength) / Double(total))
     }
 
     static func meta(_ doc: Node, _ keys: [String]) -> String? {
@@ -424,17 +528,21 @@ public enum HTMLText {
         let body = doc.first("body") ?? doc
 
         // 1. Unlikely candidates out.
+        var dirty: [Node] = []
         for e in body.elements() {
             guard e.parent != nil else { continue }
-            if unlikelyTags.contains(e.name) { e.remove(); continue }
+            if unlikelyTags.contains(e.name) { e.detach(&dirty); continue }
             if ["body", "html", "article", "main"].contains(e.name) { continue }
             let role = (e.attrs["role"] ?? "").lowercased()
-            if ["navigation", "banner", "contentinfo", "complementary", "dialog", "alert", "menu"].contains(role) { e.remove(); continue }
+            if ["navigation", "banner", "contentinfo", "complementary", "dialog", "alert", "menu"].contains(role) { e.detach(&dirty); continue }
             // `hidden="until-found"` (collapsed sections, e.g. mobile Wikipedia) is findable, readable text.
-            if e.attrs["aria-hidden"] == "true" || (e.attrs["hidden"] != nil && e.attrs["hidden"] != "until-found") { e.remove(); continue }
+            if e.attrs["aria-hidden"] == "true" || (e.attrs["hidden"] != nil && e.attrs["hidden"] != "until-found") { e.detach(&dirty); continue }
             let s = e.classAndID
-            if isNegative(s) && !positiveHints.contains(where: { s.contains($0) }) { e.remove() }
+            if isNegative(s) && !positiveHints.contains(where: { s.contains($0) }) { e.detach(&dirty) }
         }
+        for parent in dirty { parent.sweep() }
+        // Text lengths, commas and link text of every subtree, once.
+        measure(doc)
 
         // 2. Score paragraphs into their parents and grandparents.
         var candidates: [Node] = []
@@ -462,10 +570,9 @@ public enum HTMLText {
             default: isParagraphLike = false
             }
             guard isParagraphLike else { continue }
-            let t = e.innerText
-            guard t.count >= 25, let parent = e.parent else { continue }
-            let commas = t.filter { $0 == "," || $0 == "，" || $0 == "、" }.count
-            let s = 1 + Double(commas) + min(3, Double(t.count) / 100)
+            let length = e.textLength
+            guard length >= 25, let parent = e.parent else { continue }
+            let s = 1 + Double(e.commas) + min(3, Double(length) / 100)
             initialize(parent)
             parent.score += s
             if let gp = parent.parent, gp !== doc {
@@ -487,9 +594,9 @@ public enum HTMLText {
                 guard !sib.isText else { return false }
                 if sib.scored && sib.score >= threshold { return true }
                 if sib.name == "p" {
-                    let t = sib.innerText, ld = linkDensity(sib)
-                    if t.count > 80 && ld < 0.25 { return true }
-                    if t.count > 0 && t.count <= 80 && ld == 0 && t.contains(". ") { return true }
+                    let length = sib.textLength, ld = linkDensity(sib)
+                    if length > 80 && ld < 0.25 { return true }
+                    if length > 0 && length <= 80 && ld == 0 && sib.innerText.contains(". ") { return true }
                 }
                 return false
             }

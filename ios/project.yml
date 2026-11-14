@@ -3,10 +3,16 @@
 name: PixelClip
 
 options:
-  bundleIdPrefix: com.example
   deploymentTarget:
     iOS: "26.0"
   createIntermediateGroups: true
+
+# The identifiers a builder owns (Apple team, bundle id prefix, App Group) are not in this file:
+# Config.xcconfig holds placeholders that build for the simulator with no setup, and includes your own
+# git-ignored Local.xcconfig when there is one (copy Local.xcconfig.example). See README ▸ Bundle id and signing.
+configFiles:
+  Debug: Config.xcconfig
+  Release: Config.xcconfig
 
 settings:
   base:
@@ -16,8 +22,7 @@ settings:
     TARGETED_DEVICE_FAMILY: "1"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     DEAD_CODE_STRIPPING: YES
-    # Set your own Apple team id here (Xcode ▸ Settings ▸ Accounts) to build for a device.
-    DEVELOPMENT_TEAM: ""
+    # DEVELOPMENT_TEAM, BUNDLE_ID_PREFIX and APP_GROUP_ID come from Config.xcconfig / Local.xcconfig.
     CODE_SIGN_STYLE: Automatic
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
@@ -68,7 +73,7 @@ targets:
         com.apple.developer.networking.HotspotConfiguration: true
         # Shared with the PixelClipShare extension: texts and links saved from Safari/Notes (Reader).
         com.apple.security.application-groups:
-          - group.com.example.pixelclip
+          - $(APP_GROUP_ID)
     info:
       path: Sources/Info.plist
       properties:
@@ -78,14 +83,16 @@ targets:
         UILaunchScreen: {}
         CFBundleDevelopmentRegion: en
         ITSAppUsesNonExemptEncryption: false
+        # The App Group, for the code (Shared/ReaderInbox.swift ▸ AppGroup): the same build setting as the entitlement.
+        PixelClipAppGroup: $(APP_GROUP_ID)
         # English here; French in Sources/Resources/fr.lproj/InfoPlist.strings. The hotspot join and
         # notifications have no Info.plist strings: iOS words those prompts itself.
         NSLocalNetworkUsageDescription: PixelClip sends pictures and settings to your clip over the clip’s own Wi‑Fi.
-        # Bluetooth LE "doorbell" (PROTOCOL §3): wakes the clip so it turns its Wi‑Fi on. Bluetooth is
-        # foreground only (Home peeks every 30 s); the app drops its link whenever it goes to the background.
-        NSBluetoothAlwaysUsageDescription: PixelClip uses Bluetooth to wake your clip and turn on its Wi‑Fi, so you don’t have to press its button.
+        # Bluetooth LE (PROTOCOL §3, §3b): finds the clip, wakes its Wi‑Fi (the "doorbell") and carries the small
+        # requests (settings, the playlist, the clock: the fast lane). Foreground only (Home peeks every 30 s);
+        # the app drops its link whenever it goes to the background.
+        NSBluetoothAlwaysUsageDescription: PixelClip uses Bluetooth to find and wake your clip and to send it small updates.
         NSPhotoLibraryUsageDescription: PixelClip uses the photos and videos you pick to make pictures for your clip.
-        NSPhotoLibraryAddUsageDescription: PixelClip saves screenshots of your clip to your photo library when you ask.
         NSAppTransportSecurity:
           # The clip speaks plain HTTP on 192.168.4.1 / pixelclip.local (its own SoftAP, WPA2).
           NSAllowsLocalNetworking: true
@@ -139,7 +146,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: PixelClip
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.pixelclip
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).pixelclip
         INFOPLIST_KEY_CFBundleDisplayName: PixelClip
 
   # Share Extension "PixelClip": a photo, GIF or video from Photos or any app (→ Send's crop screen), or a text
@@ -158,11 +165,12 @@ targets:
       path: ShareExtension/PixelClipShare.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.example.pixelclip
+          - $(APP_GROUP_ID)
     info:
       path: ShareExtension/Info.plist
       properties:
         CFBundleDisplayName: PixelClip
+        PixelClipAppGroup: $(APP_GROUP_ID)
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CFBundleDevelopmentRegion: en
@@ -180,7 +188,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: PixelClipShare
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.pixelclip.share
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).pixelclip.share
         INFOPLIST_KEY_CFBundleDisplayName: PixelClip
         SKIP_INSTALL: YES
         APPLICATION_EXTENSION_API_ONLY: YES
@@ -195,7 +203,7 @@ targets:
       - target: PixelClip
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.pixelclip.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).pixelclip.uitests
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: PixelClip
         SWIFT_VERSION: "6.0"

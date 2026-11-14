@@ -197,6 +197,8 @@ private struct LibraryIndex: Codable {
     var playlist: [LegacyPlaylistEntry]
     var lastSentFingerprint: String?
     var lastSentAt: Date?
+    /// The fingerprint last sent to each clip, by its device id (absent in older indexes).
+    var sentFingerprints: [String: String]?
 }
 
 /// The library on disk: Application Support/Library/index.json plus one folder per item holding
@@ -206,8 +208,12 @@ final class LibraryStore {
     private(set) var items: [LibraryItem] = []
     /// The old playlist (read once to migrate it to Now + the playlist, see `ClipDocument.migrateIfNeeded`).
     private(set) var playlist: [LegacyPlaylistEntry] = [] { didSet { save() } }
+    /// The fingerprint of the last document sent, to whichever clip.
     private(set) var lastSentFingerprint: String?
     private(set) var lastSentAt: Date?
+    /// What each clip was last sent, by its device id: "sent" is a fact about one clip, so a send to a
+    /// second clip (or to something posing as one) doesn't make the first look up to date.
+    private(set) var sentFingerprints: [String: String] = [:]
     /// Bumped when an item's rendered asset changes, so previews reload.
     private(set) var revision = 0
 
@@ -220,6 +226,8 @@ final class LibraryStore {
             .appendingPathComponent("Library", isDirectory: true)
         self.root = base
         try? FileManager.default.createDirectory(at: base.appendingPathComponent("items"), withIntermediateDirectories: true)
+        DataProtection.protect(base, .afterFirstUnlock)
+        DataProtection.protect(base.appendingPathComponent("items"), .afterFirstUnlock)
         load()
     }
 
@@ -253,11 +261,13 @@ final class LibraryStore {
         }
         lastSentFingerprint = idx.lastSentFingerprint
         lastSentAt = idx.lastSentAt
+        sentFingerprints = idx.sentFingerprints ?? [:]
         playlist = idx.playlist.filter { e in items.contains { $0.id == e.assetID } }   // (didSet saves: keep last)
     }
 
     private func save() {
-        let idx = LibraryIndex(items: items, playlist: playlist, lastSentFingerprint: lastSentFingerprint, lastSentAt: lastSentAt)
+        let idx = LibraryIndex(items: items, playlist: playlist, lastSentFingerprint: lastSentFingerprint, lastSentAt: lastSentAt,
+                               sentFingerprints: sentFingerprints.isEmpty ? nil : sentFingerprints)
         guard let data = try? JSONEncoder.iso.encode(idx) else { return }
         try? data.write(to: root.appendingPathComponent("index.json"), options: .atomic)
     }
@@ -338,11 +348,26 @@ final class LibraryStore {
         save()
     }
 
-    /// Record a successful send of the composed playlist (see `ClipDocument`).
-    func markSent(fingerprint: String) {
+    /// Record a successful send of the composed playlist (see `ClipDocument`) to the clip with this
+    /// device id (nil when the clip never said who it was).
+    func markSent(fingerprint: String, deviceID: String?) {
         lastSentFingerprint = fingerprint
         lastSentAt = Date()
+        if let deviceID {
+            if sentFingerprints.count >= Self.clipsRemembered, sentFingerprints[deviceID] == nil { sentFingerprints.removeAll() }
+            sentFingerprints[deviceID] = fingerprint
+        }
         save()
+    }
+
+    /// Clips whose last send is remembered (an id is the clip's to claim, so the list is bounded).
+    static let clipsRemembered = 16
+
+    /// What this clip was last sent. A clip the app has no record for was sent nothing, except when no
+    /// send has been recorded by clip yet (an index from before they were told apart).
+    func sentFingerprint(for deviceID: String?) -> String? {
+        guard let deviceID, !sentFingerprints.isEmpty else { return lastSentFingerprint }
+        return sentFingerprints[deviceID]
     }
 
     // MARK: Clip documents

@@ -4,7 +4,9 @@
  * Runs on the fast-lane worker task of components/ble (never the NimBLE host task). Differences from the
  * HTTP adapter, all by design:
  *   - the body is already in memory (no recv hook) and there are no request headers;
- *   - bulk routes (api_route_t.bulk) are answered 413 {"ok":false,"error":"use_wifi"} without running;
+ *   - WiFi-only routes (api_route_t.wifi_only: the bulk transfers, /imu, /imu/calibrate, /queue/test) are
+ *     answered 413 {"ok":false,"error":"use_wifi"} without running, and so is a PUT /config that carries
+ *     `ap_password` (http_api.c);
  *   - the response is collected into the fast-lane buffer; one larger than PIXELCLIP_BLE_API_MAX_BYTES is
  *     replaced by 413 use_wifi;
  *   - net_touch() is never called: a fast-lane request does not start or extend a WiFi session;
@@ -73,7 +75,7 @@ static esp_err_t ble_send_chunk(api_req_t *r, const char *type, const char *data
 static const api_ops_t s_ble_ops = {
     .send = ble_send,
     .send_chunk = ble_send_chunk,
-    .recv = NULL,     /* bulk only: refused before dispatch */
+    .recv = NULL,     /* streaming bodies are WiFi only: refused before dispatch */
     .header = NULL,
 };
 
@@ -116,6 +118,7 @@ static size_t api_ble_handle(char *req, size_t req_len, char *rsp, size_t rsp_ca
         .ops = &s_ble_ops,
         .ctx = &w,
         .transport = "ble",
+        .ble = true,
     };
     const char *q = strchr(z.path, '?');
     r.query = q ? q + 1 : NULL;
@@ -124,10 +127,10 @@ static size_t api_ble_handle(char *req, size_t req_len, char *rsp, size_t rsp_ca
     const api_route_t *rt = api_find_route(r.method, z.path, strcspn(z.path, "?"), &path_known);
     if (!rt) {
         (path_known ? api_bad_method : api_not_found)(&r);
-    } else if (rt->bulk) {
-        ESP_LOGW(TAG, "%s %s: bulk transfer -> 413 use_wifi", z.method, z.path);
+    } else if (rt->wifi_only) {
+        ESP_LOGW(TAG, "%s %s: WiFi only -> 413 use_wifi", z.method, z.path);
         api_send_error(&r, "413 Payload Too Large", "use_wifi",
-                       "bulk transfer: open the WiFi hotspot (BLE wake 0x01) and use HTTP");
+                       "WiFi only: open the WiFi hotspot (BLE wake 0x01) and use HTTP");
     } else if (z.body_len > PIXELCLIP_BLE_API_MAX_BYTES) {
         api_send_error(&r, "413 Payload Too Large", "too_large", "fast-lane request bodies are limited to 16 KB");
     } else if (!api_lock(LOCK_TIMEOUT_MS)) {

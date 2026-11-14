@@ -15,8 +15,12 @@ struct ReaderExtra: View {
     @State private var chosen: String?
     @State private var picking = false
     @State private var working = false
+    /// Why the last file couldn't be read (shown under the buttons until the next import).
+    @State private var importProblem: String?
 
     static let speeds = [250, 350, 500]
+    /// The biggest file read from Files (a novel is a few MB; an illustrated EPUB some tens).
+    static let maxFileBytes = 256 << 20
 
     private var doc: ReaderDocument? { chosen.flatMap { store.document($0) } }
 
@@ -49,6 +53,11 @@ struct ReaderExtra: View {
                         .overlay { Capsule().strokeBorder(Z2.border, lineWidth: 1) }
                 }
                 .buttonStyle(Z2Press(scale: 0.95))
+            }
+            if let importProblem {
+                Label(importProblem, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote).foregroundStyle(.orange)
+                    .accessibilityIdentifier("readerImportProblem")
             }
             if !store.documents.isEmpty {
                 VStack(spacing: 0) {
@@ -87,6 +96,11 @@ struct ReaderExtra: View {
         }
         .onChange(of: store.wpm) { _, w in player.wpm = w }
         .task {
+            // A shared item that couldn't be opened, when the Reader was opened for one that could.
+            if let problem = store.inboxProblem {
+                importProblem = problem
+                store.dismissInboxProblem()
+            }
             if !Self.speeds.contains(store.wpm) { store.wpm = 350 }
             chosen = openDocID ?? chosen ?? store.documents.first?.id
         }
@@ -103,14 +117,31 @@ struct ReaderExtra: View {
 
     private func paste(_ strings: [String]) {
         guard let text = strings.first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else { return }
+        importProblem = nil
         chosen = store.add(TextImporter.plain(text, fallbackTitle: nil)).id
     }
 
+    /// Reads and converts the picked file off the main actor (a book takes a moment; the screen stays live).
     private func importFile(_ url: URL) async {
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        guard let data = try? Data(contentsOf: url) else { return }
-        if let imported = try? TextImporter.file(data, name: url.lastPathComponent) { chosen = store.add(imported).id }
+        let limit = Self.maxFileBytes
+        let result: Result<ImportedText, any Error> = await Task.detached(priority: .userInitiated) {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            do {
+                if let size = InboxClaims.size(of: url), size > limit { throw TextImportError.tooLarge }
+                let data = try Data(contentsOf: url, options: .mappedIfSafe)
+                return .success(try TextImporter.file(data, name: url.lastPathComponent))
+            } catch {
+                return .failure(error)
+            }
+        }.value
+        switch result {
+        case .success(let imported):
+            importProblem = nil
+            chosen = store.add(imported).id
+        case .failure(let error):
+            importProblem = (error as? TextImportError)?.errorDescription ?? "That file couldn’t be opened."
+        }
     }
 
     private func send() {

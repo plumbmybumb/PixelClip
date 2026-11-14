@@ -1,7 +1,7 @@
 /* power.h — battery monitoring, USB presence, CPU frequency / light-sleep policy and deep sleep ("off").
  *
- * Battery: CONFIG_HAIRCLIP_BAT_ADC_GPIO (default GPIO1 = ADC1_CH0; GPIO4 on the LilyGo) behind a 100k/100k divider, curve-fitting calibrated, x2, sampled every
- * CONFIG_HAIRCLIP_BATTERY_SAMPLE_S with a 4-sample moving average. The PL4054 charger has no
+ * Battery: CONFIG_PIXELCLIP_BAT_ADC_GPIO (default GPIO1 = ADC1_CH0; GPIO4 on the LilyGo) behind a 100k/100k divider, curve-fitting calibrated, x2, sampled every
+ * CONFIG_PIXELCLIP_BATTERY_SAMPLE_S with a 4-sample moving average. The PL4054 charger has no
  * status line to the MCU, so `usb_present`/`charging` are heuristics, re-evaluated every second:
  *   usb_present = the USB-Serial-JTAG sees SOF packets from a host right now (not sticky: the IDF tick hook
  *                 clears it ~3 ms after the last SOF)
@@ -11,7 +11,7 @@
  * so usb_present drops within ~3 s of unplugging (README "Light sleep on battery"). While usb_present is true
  * (and 5 s after) power.c holds POWER_AWAKE_USB: no automatic light sleep on USB (README "USB light-sleep inhibit").
  *
- * CPU: esp_pm DFS between CONFIG_HAIRCLIP_CPU_MIN_MHZ and _MAX_MHZ with automatic light sleep.
+ * CPU: esp_pm DFS between CONFIG_PIXELCLIP_CPU_MIN_MHZ and _MAX_MHZ with automatic light sleep.
  * Code that needs speed brackets itself with power_perf_acquire/release(owner); every owner has its own
  * hold count so a leak can be attributed (power_perf_held(), power_perf_report()).
  */

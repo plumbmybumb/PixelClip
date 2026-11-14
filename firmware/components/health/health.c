@@ -1,6 +1,7 @@
 /* health.c — RTC watchdog that keeps counting in light sleep, liveness, reset accounting (health.h). */
 #include "health.h"
 #include "health_priv.h"
+#include "health_safe.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -82,6 +83,17 @@ typedef struct {
 } item_crumb_t;
 
 static RTC_NOINIT_ATTR item_crumb_t s_item;
+
+/* Safe start (health.h): how many boots in a row followed a crash (panic or watchdog) of a run that was still
+ * young. Its own RTC_NOINIT block and magic, like the item crumb, so the blocks above keep their layout. RTC
+ * memory survives exactly the resets that count here; a power loss clears the streak, which is fine. */
+#define SAFE_MAGIC          0x5A4E5331u   /* "ZNS1" */
+typedef struct {
+    uint32_t magic;
+    uint32_t early_crashes;
+} safe_crumb_t;
+static RTC_NOINIT_ATTR safe_crumb_t s_safe;
+static bool s_safe_start;
 
 /* Reset history: the last 8 boots' reset reason, how long the run before each lasted and its last battery
  * reading. Survives every reset that keeps RTC memory (which is how we know a battery-only reboot was not
@@ -446,6 +458,18 @@ const char *health_boot_record(void)
         s_prev.http[HTTP_CRUMB_MAX - 1] = '\0';
         s_prev_valid = true;
     }
+    /* Safe start (the rule and its reasons: health_safe.h). "Young" is judged by the previous run's last sign
+     * of life (the crumbs' up_s): a hang at boot that the watchdog only ends minutes later still counts. */
+    {
+        const health_safe_in_t in = {
+            .crash = panic || wdt,
+            .radio_only = rtc_wdt && s_prev_valid && s_prev.starved_mask != 0 && !(s_prev.starved_mask & ~OPTIONAL_SRCS),
+            .prev_known = s_prev_valid,
+            .prev_up_s = s_prev_valid ? s_prev.up_s : 0,
+        };
+        s_safe.early_crashes = health_safe_rule(s_safe.magic == SAFE_MAGIC ? s_safe.early_crashes : 0, &in, &s_safe_start);
+        s_safe.magic = SAFE_MAGIC;
+    }
     bool hist_from_flash = false;
     if (s_hist.magic != HIST_MAGIC) {
         /* RTC memory gone (a real power loss): continue the history from its flash mirror. */
@@ -570,8 +594,17 @@ const char *health_boot_record(void)
                  hist_from_flash ? "; RTC memory was lost, history continued from flash" : "", line);
     }
     health_coredump_boot_report();
+    if (s_safe_start) {
+        ESP_LOGE(TAG, "safe start: %d boots in a row crashed within %d s: this boot starts without the stored playlist",
+                 HEALTH_SAFE_START_CRASHES, HEALTH_SAFE_START_WINDOW_S);
+    } else if (s_safe.early_crashes) {
+        ESP_LOGW(TAG, "%lu early crash(es) in a row (safe start at %d)", (unsigned long)s_safe.early_crashes,
+                 HEALTH_SAFE_START_CRASHES);
+    }
     return s_reason;
 }
+
+bool health_safe_start(void) { return s_safe_start; }
 
 const char *health_reset_name(void) { return s_reason; }
 

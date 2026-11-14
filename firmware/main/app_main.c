@@ -27,6 +27,7 @@
 #include "power.h"
 #include "button.h"
 #include "player.h"
+#include "playlist.h"
 #include "net.h"
 #include "ota.h"
 #include "batlog.h"
@@ -551,6 +552,22 @@ static esp_err_t init_nvs(void)
     return err;
 }
 
+/* The few config values app_main needs. Read in a function of their own: app_main never returns, so anything
+ * in its frame is in every core dump (security audit WIFI-10). appcfg_t itself no longer holds the hotspot
+ * passphrase (appcfg.h); this keeps the rest of the config off that frame as well. */
+typedef struct {
+    uint8_t low_battery_pct, brightness;
+    appcfg_orientation_t orientation;
+    bool ble_wake;
+} boot_cfg_t;
+
+static __attribute__((noinline)) boot_cfg_t boot_cfg(void)
+{
+    appcfg_t cfg;
+    appcfg_get(&cfg);
+    return (boot_cfg_t){ cfg.low_battery_pct, cfg.brightness, cfg.orientation, cfg.ble_wake };
+}
+
 void app_main(void)
 {
     const int64_t t0 = esp_timer_get_time();
@@ -586,8 +603,7 @@ void app_main(void)
      * panel from here on; the panel is already on after display_init(). */
     display_set_power_cb(panel_power_changed);
     if (display_is_on()) panel_power_changed(true);
-    appcfg_t cfg;
-    appcfg_get(&cfg);
+    const boot_cfg_t cfg = boot_cfg();
     power_set_low_battery_pct(cfg.low_battery_pct);
     boot_step("imu", imu_init());               /* optional: scenes fall back to fixed gravity */
     orient_init(cfg.orientation);               /* 180° flip (PROTOCOL §4 "Orientation"), before the splash */
@@ -599,6 +615,14 @@ void app_main(void)
         boot_step("ble", pixelclip_ble_set_enabled(true));
     } else if (!cfg.ble_wake) {
         ESP_LOGI(TAG, "BLE doorbell disabled (ble_wake false)");
+    }
+    /* Safe start (health.h): after three crashes in a row shortly after boot the stored playlist is set aside,
+     * so content that crashes the clip at every boot cannot keep it unreachable: it comes up idle, the hotspot
+     * and the BLE doorbell work, and the owner sends the playlist again. Assets, texts and fonts stay. */
+    if (health_safe_start()) {
+        const bool had = playlist_set_aside();
+        ESP_LOGE(TAG, "safe start: %s", had ? "stored playlist set aside as playlist.bad.json: send it again from the app"
+                                            : "there was no stored playlist");
     }
     boot_step("sched", sched_init());           /* queue done-set; before the player loads the queue */
     /* Embedded boot splash (main/assets/splash.hca at build time), before the player owns the panel. */

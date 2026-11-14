@@ -1,3 +1,4 @@
+import Compression
 import Foundation
 
 /// Just enough ZIP (PKWARE APPNOTE) to open an EPUB: the central directory, stored and deflated
@@ -70,6 +71,42 @@ public struct ZipArchive: Sendable {
         return try read(e)
     }
 
+    /// Raw DEFLATE (Apple's "zlib" algorithm, exactly a ZIP entry's payload) to exactly `size` bytes,
+    /// in 64 KB pieces: the size the directory declares is a promise the stream is held to, so an entry
+    /// that says 10 bytes and holds 300 MB stops at the 11th (`tooLarge`), and one that comes up short is
+    /// `corrupt`.
+    static func inflate(_ raw: Data, size: Int) throws -> Data {
+        guard !raw.isEmpty else { throw ZipError.corrupt }
+        let stream = UnsafeMutablePointer<compression_stream>.allocate(capacity: 1)
+        defer { stream.deallocate() }
+        guard compression_stream_init(stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB) == COMPRESSION_STATUS_OK else { throw ZipError.corrupt }
+        defer { compression_stream_destroy(stream) }
+        let chunk = 64 << 10
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: chunk)
+        defer { buffer.deallocate() }
+        var out = Data()
+        out.reserveCapacity(min(size, 4 << 20))
+        try raw.withUnsafeBytes { (src: UnsafeRawBufferPointer) in
+            guard let base = src.bindMemory(to: UInt8.self).baseAddress else { throw ZipError.corrupt }
+            stream.pointee.src_ptr = base
+            stream.pointee.src_size = src.count
+            while true {
+                stream.pointee.dst_ptr = buffer
+                stream.pointee.dst_size = chunk
+                let status = compression_stream_process(stream, Int32(COMPRESSION_STREAM_FINALIZE.rawValue))
+                let produced = chunk - stream.pointee.dst_size
+                if produced > 0 {
+                    guard out.count + produced <= size else { throw ZipError.tooLarge }
+                    out.append(buffer, count: produced)
+                }
+                if status == COMPRESSION_STATUS_END { return }
+                guard status == COMPRESSION_STATUS_OK, produced > 0 else { throw ZipError.corrupt }
+            }
+        }
+        guard out.count == size else { throw ZipError.corrupt }
+        return out
+    }
+
     public func read(_ e: Entry) throws -> Data {
         guard e.size <= Self.maxEntryBytes else { throw ZipError.tooLarge }
         let o = data.startIndex + e.localHeaderOffset
@@ -83,9 +120,7 @@ public struct ZipArchive: Sendable {
         case 0: return raw
         case 8:
             if e.size == 0 { return Data() }
-            // Apple's "zlib" algorithm is raw DEFLATE, which is exactly a ZIP entry's payload.
-            guard let out = try? (raw as NSData).decompressed(using: .zlib) as Data else { throw ZipError.corrupt }
-            return out
+            return try Self.inflate(raw, size: e.size)
         default:
             throw ZipError.unsupported("method \(e.method)")
         }

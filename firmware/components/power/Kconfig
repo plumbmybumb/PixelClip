@@ -1,0 +1,30 @@
+menu "PixelClip power (battery ADC, DFS, light sleep)"
+
+    config HAIRCLIP_CPU_MAX_MHZ
+        int "CPU frequency while decoding / in upload mode (MHz)"
+        range 80 240
+        default 160
+
+    config HAIRCLIP_CPU_MIN_MHZ
+        int "Idle CPU frequency (MHz)"
+        range 40 160
+        default 80
+
+    config HAIRCLIP_AUTO_LIGHT_SLEEP
+        bool "Enable automatic light sleep"
+        default y
+
+    config HAIRCLIP_BATTERY_SAMPLE_S
+        int "Battery sampling period (s)"
+        range 5 300
+        default 30
+
+    config HAIRCLIP_BAT_ADC_GPIO
+        int "Battery divider ADC GPIO (ADC1 only)"
+        range 1 10
+        default 1
+        help
+            GPIO of the battery divider midpoint (100k/100k assumed: the reading is doubled). Must be an
+            ADC1 pin (GPIO1..10 on the ESP32-S3; ADC2 is unusable while WiFi runs).
+            Waveshare ESP32-S3-AMOLED-1.91 (PixelClip): 1. LilyGo T-Display-S3 AMOLED: 4.
+endmenu

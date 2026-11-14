@@ -1,0 +1,6 @@
+build/
+PixelClip.xcodeproj/
+*.xcodeproj/xcuserdata/
+PixelClipKit/.build/
+PixelClipKit/.swiftpm/
+.DS_Store

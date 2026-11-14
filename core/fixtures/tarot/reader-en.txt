@@ -1,0 +1,1537 @@
+[question]
+{q.name} asks you: {q.question}
+{q.name} opens the reading and asks: {q.question}
+The question comes from {q.name}: {q.question}
+Before anything is read, {q.name} puts a question to you: {q.question}
+The Tarot speaks first through {q.name}: {q.question}
+{q.name} comes forward with a question: {q.question}
+[arc.rising]
+The path climbs ({A.num}, {B.num}, {C.num}): {A.kw}, then {B.kw}, then {C.kw}.
+The degrees rise ({A.num}, {B.num}, {C.num}): the energy ripens card by card, {A.kw}, {B.kw}, {C.kw}.
+Everything climbs ({A.num} to {C.num}): {A.kw} carries on into {B.kw} and fulfils itself in {C.kw}.
+Each card stands on the one before ({A.num}, {B.num}, {C.num}): {A.kw}, {B.kw}, {C.kw}.
+Towards fulfilment ({A.num}, {B.num}, {C.num}): {A.kw} opens, {B.kw} carries, {C.kw} completes.
+An ascent ({A.num}, {B.num}, {C.num}): what starts as {A.kw} grows into {B.kw} and ripens into {C.kw}.
+[arc.falling]
+The path comes down ({A.num}, {B.num}, {C.num}): from experience back to the source, {A.kw}, {B.kw}, {C.kw}.
+The degrees fall back to the root ({A.num}, {B.num}, {C.num}): {A.kw}, {B.kw}, then {C.kw}.
+Everything comes down ({A.num} to {C.num}): after {A.kw} and {B.kw}, you need to find {C.kw} again.
+A return to the source ({A.num}, {B.num}, {C.num}): {A.kw} gives way to {B.kw}, then to {C.kw}.
+The degrees step back ({A.num}, {B.num}, {C.num}): not a fall but a fresh start, {A.kw}, {B.kw}, {C.kw}.
+Back to the beginning ({A.num}, {B.num}, {C.num}): after {A.kw} and {B.kw}, here is {C.kw}.
+[arc.peak]
+The summit is in the middle ({B.num}): {B.kw} stands above {A.kw} and {C.kw}.
+Everything peaks with {B.kw} ({B.num}), which gathers the energy before it settles into {C.kw}.
+The degrees climb and come down again ({A.num}, {B.num}, {C.num}): {A.kw}, the high point {B.kw}, then {C.kw}.
+In the middle, the highest degree ({B.num}): {B.kw} is the point from which the whole reading can be seen.
+Everything climbs to {B.kw} ({A.num}, {B.num}, {C.num}): {A.kw} leads up to it, {C.kw} flows from it.
+A summit between two slopes ({A.num}, {B.num}, {C.num}): everything converges on {B.kw}.
+[arc.dip]
+The path dips and climbs again ({A.num}, {B.num}, {C.num}): {B.kw} is the hollow the energy starts back from.
+The lowest degree is in the middle ({B.num}): between {A.kw} and {C.kw} you pass back through {B.kw}.
+{A.kw}, then {B.kw}, then {C.kw} ({A.num}, {B.num}, {C.num}): the valley prepares the climb.
+A passage through the low ground ({A.num}, {B.num}, {C.num}): {B.kw} makes you take things up from their beginning.
+Between {A.kw} and {C.kw} the energy plunges ({B.num}): {B.kw} is a necessary return.
+The hollow is in the centre ({A.num}, {B.num}, {C.num}): before {C.kw}, the way comes back to {B.kw}.
+[arc.plateau]
+Two cards share a degree ({A.num}, {B.num}, {C.num}): the energy insists, {A.kw}, {B.kw}, {C.kw}.
+The path reaches a landing ({A.num}, {B.num}, {C.num}): one stage asks to be lived twice.
+A degree repeats ({A.num}, {B.num}, {C.num}): {A.kw}, {B.kw}, {C.kw}. What comes back isn't finished.
+The degree holds steady from card to card ({A.num}, {B.num}, {C.num}): go deeper before moving on.
+Two cards on one level ({A.num}, {B.num}, {C.num}): {A.kw}, {B.kw}, {C.kw}, one stage lived under two faces.
+A halt on the road ({A.num}, {B.num}, {C.num}): the energy settles before it sets off again.
+[arc.still]
+All three cards stand on one degree ({A.num}, {B.num}, {C.num}): the energy doesn't move, it deepens.
+No movement between degrees ({A.num}, {B.num}, {C.num}): everything happens in place, in depth.
+One degree for three cards ({A.num}, {B.num}, {C.num}): stay where you are, and dig.
+Three times the same degree ({A.num}, {B.num}, {C.num}): here everything is intensity.
+The path neither climbs nor falls ({A.num}, {B.num}, {C.num}): it goes deep.
+One degree in three forms ({A.num}, {B.num}, {C.num}): look at what insists.
+[gaze.facing]
+{A.name} and {B.name} face each other: a dialogue opens between {A.kw} and {B.kw}.
+{A.name} looks at {B.name}, who looks back: these two energies are seeking each other.
+Face to face, {A.name} and {B.name}: what passes between them is at the heart of your question.
+{A.name} and {B.name} look at each other: what is going on between these two cards needs to be said.
+{A.name} and {B.name} meet each other's eyes: an alliance or a clash, but real contact.
+{A.name} turns towards {B.name}, who turns back: two energies in conversation.
+[gaze.back]
+{A.name} and {B.name} turn their backs on each other: two energies ignoring each other, or parting.
+Back to back, {A.name} and {B.name} look elsewhere: something is going unsaid.
+{A.name} and {B.name} don't see each other: each keeps its own direction, and it's for you to join them.
+{A.name} looks back, {B.name} looks ahead: two times that haven't met yet.
+Neither {A.name} nor {B.name} seeks the other: each of these energies works alone.
+{A.name} and {B.name} look away from each other: a separation, perhaps a necessary one.
+[gaze.follow]
+{A.name} follows {B.name} with its eyes: {A.kw} walks behind {B.kw}.
+{A.name} looks the same way as {B.name}: one draws the other along.
+{A.name} follows {B.name}: one direction, two energies.
+{A.name} looks towards {B.name}: what goes ahead draws what follows.
+{A.name} watches over {B.name}: {A.kw} supports {B.kw}.
+{A.name} walks behind {B.name}: one impulse, two stages.
+[gaze.front]
+{B.name} looks straight at you: this card speaks to you directly.
+{B.name} raises its eyes to you: {B.kw} is about you.
+{B.name} holds your gaze: {B.kw}, here and now.
+{B.name} looks at no other card, only at you: {B.kw} is meant for you.
+Face on, {B.name} calls you as a witness: {B.kw} is your business today.
+{B.name} speaks to you plainly: {B.kw}, here.
+[gaze.center.left]
+{B.name} turns towards what came before: {A.role}.
+{B.name} looks back, towards {A.role}.
+{B.name} looks at where you come from: {A.role}.
+{B.name} looks steadily at {A.role}: the past still has something to say.
+{B.name} addresses the card on the left, {A.role}: there is still something to understand there.
+Turned towards the past, {B.name} questions {A.role}.
+[gaze.center.right]
+{B.name} turns towards what is coming: {C.role}.
+{B.name} looks ahead, towards {C.role}.
+{B.name} looks at where you are going: {C.role}.
+{B.name} looks steadily at {C.role}: the future is already calling.
+{B.name} addresses the card on the right, {C.role}: that is the way the energy wants to go.
+Turned towards the future, {B.name} questions {C.role}.
+[kin.sum21]
+{A.name} and {B.name} add up to twenty-one: two faces of one realization.
+Add {A.num} and {B.num}: twenty-one. {A.name} and {B.name} answer each other as in a mirror.
+{A.name} and {B.name} complete each other up to The World: two faces of one realization.
+Together {A.name} and {B.name} make twenty-one: what one lacks, the other brings.
+{A.name} and {B.name} form a pair of twenty-one: two roads to the same fulfilment.
+The numbers {A.num} and {B.num} make twenty-one: these two cards reflect and complete each other.
+[kin.same]
+{A.name} and {B.name} share a degree: the same energy, on the surface and in depth.
+{A.num} and {B.num} are one degree in the two series: what plays out outside plays out inside too.
+One degree for {A.name} and {B.name}: an energy lived in the world, then within you.
+{A.name} and {B.name} are one degree, one in the first series, the other in the second: the action and its root.
+The same number comes back, deeper ({A.num}, {B.num}): {A.name} and {B.name} are one energy on two levels.
+{A.name} and {B.name} vibrate on the same degree: what shows in the world has its echo within.
+[positions]
+In the centre, {B.name}, {B.role}. You come {A.from}, you go {C.to}.
+At the heart of the reading, {B.name}: {B.role}. You arrive {A.from} and move {C.to}.
+{B.name} holds the centre, {B.role}. You set out {A.from}; ahead of you the road leads {C.to}.
+In the middle stands {B.name}, {B.role}. You step out {A.from} and head {C.to}.
+The centre is {B.name}: {B.role}. You come {A.from}; the next step goes {C.to}.
+{B.name}, {B.role}, holds the middle. You arrive {A.from}, and the energy carries you {C.to}.
+[echo]
+One sign returns from card to card: {tag}.
+Notice what repeats in the reading: {tag}.
+The reading insists on one sign, {tag}.
+One symbol links these cards: {tag}.
+The same motif is drawn more than once: {tag}.
+What repeats has a meaning: {tag}.
+[qsum.two]
+Add {X.name} and {Y.name}: you find the number of {q.name} again. The answer lives in these two cards.
+The number that asks the question is hidden in the row: {X.name} and {Y.name} together give back {q.name}.
+{X.name} and {Y.name} add up to the number of {q.name}: the row answers the question with its own figures.
+The question {q.name} asks finds its number in {X.name} and {Y.name} together: look at these two first.
+Count: {X.name} plus {Y.name} gives {q.name}. The answer lies in this pair.
+{q.name} asks, {X.name} and {Y.name} answer number for number: the key is in their alliance.
+[qsum.three]
+Add the three cards: their sum gives back {q.name}. The whole row answers the question, together.
+The three numbers of the row, joined, make {q.name} again: the answer isn't in one card, it is in all of them.
+The whole row carries the number that asked the question: with {q.name}, the circle closes.
+Count the three cards: you land on {q.name} again. The question already holds its answer.
+The sum of the three cards meets {q.name}: nothing is superfluous in this row, each card has its share.
+Together the three cards make {q.name} again: the question comes back to you, lit by the whole reading.
+[step.up]
+{A.name} then {B.name}, one degree more: {A.kw}, then {B.kw}. The energy grows by a step.
+{B.name} comes just after {A.name} on the ladder of degrees: what began ripens by a notch.
+The degrees climb one stair between {A.name} and {B.name}: growth, not a leap.
+{A.name} prepares {B.name}, the next degree: {A.kw}, then {B.kw}, in the Tarot's own order.
+One step up: {A.name} gives birth to {B.name}. Growth follows its natural course.
+Between {A.name} and {B.name} the energy rises one degree: {A.kw} first, {B.kw} next.
+[step.down]
+{A.name} then {B.name}, one degree back: {A.kw}, then {B.kw}, as if to catch its breath.
+{B.name} comes before {A.name} on the ladder of degrees, but after it in the row: the energy steps back a stair.
+The degrees go down one stair between {A.name} and {B.name}: a step back, to understand rather than to fear.
+{A.name} falls back towards {B.name}: {A.kw}, then {B.kw} once more. What asks to be taken up again?
+One step down: after {A.name}, {B.name}. Sometimes stepping back a degree is the way to set off better.
+Between {A.name} and {B.name} the energy comes down a degree: a movement that lessens, or that returns to the root.
+[step.restart]
+{A.name} then {B.name}: the tenth degree hands over to the first; one cycle ends, another starts with new force.
+After {A.name}, everything begins again with {B.name}: {A.kw}, and already {B.kw}.
+{A.name} closes a loop, {B.name} opens another: the end and the beginning touch.
+From ten back to one: {A.name} then {B.name}. What ends feeds what starts.
+{A.name} completes, {B.name} relaunches: the energy that was missing returns through the first degree.
+A cycle comes full circle between {A.name} and {B.name}: {A.kw}, then {B.kw}, and the wheel turns again.
+[hsum]
+Add the three cards: the sum points to {S.name}, the hidden aspect of this reading.
+Beneath the row stands a fourth, invisible card: {S.name}, given by the three numbers together.
+The three numbers added lead to {S.name}: that is what works underneath, without showing itself.
+The hidden card of the reading is {S.name}: {S.kw}. The sum of the three reveals what acts in depth.
+Count the three numbers: they bring you to {S.name}. What that card says stays below the surface, but it acts.
+Behind the three cards, their sum brings up {S.name}: the secret ground of the question.
+[hsum.drawn]
+Add the three cards: the sum falls back on {S.name}, already in the row. That card counts twice.
+The card hidden under the row is already on the table: {S.name}. What it says is at the centre of everything.
+The three numbers together give back {S.name}: the card points to itself twice, impossible to miss.
+The sum of the reading returns to one of its own cards, {S.name}: its message is strengthened.
+Count the three numbers: they point to {S.name}, visible and hidden at once. That is where the reading weighs.
+The reading's secret ground and its surface meet in one card, {S.name}: it speaks louder than the others.
+[short.card]
+{X.num} {X.name}: {X.srole}.
+{X.num}, {X.name} — {X.srole}.
+{X.name} ({X.num}): {X.srole}.
+{X.name}, {X.num} — {X.srole}.
+{X.num} · {X.name}: {X.srole}.
+{X.name} ({X.num}), {X.srole}.
+[short.positions]
+You come {A.from}; at the centre, {B.name}, {B.srole}; you go {C.to}.
+You come {A.from}. At the heart: {B.name}, {B.srole}. You go {C.to}.
+{B.name} in the centre, {B.srole}: you come {A.from}, you go {C.to}.
+You set out {A.from}; then {B.name}, {B.srole}; you go {C.to}.
+You arrive {A.from}; in the middle, {B.name}, {B.srole}; then {C.to}.
+You leave {A.from}, cross {B.name}, {B.srole}, and go {C.to}.
+[depth]
+in depth
+[prompt]
+Hold your question, then press.
+[prompt.armed]
+Shake the deck.
+[question.lead]
+The Tarot asks you:
+[hint.waits]
+press
+[hint.armed]
+shake
+[hint.next]
+next
+[hint.back]
+back
+[hint.end]
+end
+[place.wheel.first]
+{X.name} opens the row: a cycle ends, and it is with this ending that the reading begins.
+In first place {X.name} is not a block: what is ending clears the way for what follows.
+The reading starts with {X.name}: what went round in circles stops, and something else can open.
+{X.name} at the start: the loop is closed before you even move; the rest of the row shows the next cycle.
+[place.wheel.later]
+Further along the row, {X.name} marks a stop: who can turn the crank?
+{X.name} doesn't open the reading, it interrupts it: a block waiting for help from elsewhere.
+Here {X.name} is a still wheel on the road: what hand could set it moving?
+Placed after other cards, {X.name} sets a riddle: something is going round in circles, and the answer asks for a new force.
+[place.world.first]
+{X.name} opens the row: success is required before you even act; how do you get out of this shell?
+In first place {X.name} is not a victory but a hard start: everything seems to have to be perfect at once.
+The reading begins with {X.name}: an egg still closed. What keeps you from coming out?
+{X.name} at the start: fulfilment placed before the road shuts you in; the question is where you feel cramped.
+[place.world.last]
+{X.name} closes the row: the road goes all the way to its full realization.
+In last place {X.name} gathers everything before it: a work that can come to completion.
+The reading ends on {X.name}: what began on the left finds its full form on the right.
+{X.name} at the end: the dance is possible, fulfilment within reach of what you do.
+[place.fool.before]
+The numberless traveller walks towards {X.name} and brings it all his energy: this card is amplified.
+Just before {X.name}, free energy throws itself into that card: what it says, it says louder.
+The unnumbered energy pushes towards {X.name}: the strength of the road comes to feed that card.
+Walking towards {X.name}, the free impulse gives it speed: what plays out there grows larger.
+[place.fool.after]
+The numberless traveller turns his back on {X.name} and goes: he leaves that energy, or takes it with him.
+Just after {X.name}, free energy moves away: what that card says is being left behind.
+The unnumbered impulse leaves {X.name}: a departure, a flight perhaps; what are you leaving there?
+Leaving {X.name} behind him, the traveller empties the place: what played out there loses strength, or is set free.
+[row.open.left]
+{A.name} looks out of the reading, to the left: something earlier is still at work. Where does all this come from?
+The sentence stays open on the left: {A.name} turns towards a past the reading doesn't show.
+{A.name} has its eyes on what comes before the row: an origin asks to be recognized.
+Through the gaze {A.name} turns to the left, the row opens onto a before: there is still a root to find.
+[row.open.right]
+{C.name} looks out of the reading, to the right: the story goes on beyond these three cards.
+The sentence stays open on the right: {C.name} turns towards a sequel the reading doesn't show yet.
+{C.name} has its eyes on what comes after the row: this reading leads further than itself.
+Through the gaze {C.name} turns to the right, the row opens onto an after: there is a consequence to watch for.
+[row.closed]
+{A.name} looks inwards, and so does {C.name}: the sentence is closed, everything plays out among these three cards.
+Both edges of the reading turn towards the centre: a complete sentence, holding its own answer.
+Neither {A.name} nor {C.name} looks outside: the row closes on itself, nothing is missing.
+Closed on both sides by the gazes, the sentence is enough: look for the answer in the middle.
+[couple.0-21]
+{A.name} walks straight towards {B.name}, who watches him come: boundless energy at last finds where to come true.
+{A.name} then {B.name}: the traveller reaches the end of his road, and his free force becomes a whole work.
+In this order {A.name} and {B.name} face each other: the impulse meets the place that was waiting for it.
+{A.name} moves on, {B.name} takes him into her wreath of leaves: what you spend can take shape.
+{A.name} before {B.name}: a force that didn't know where it was going finds it was heading for the whole.
+With {A.name} first and {B.name} after, the first step and the last meet: the road has a meaning.
+[couple.21-0]
+{A.name} then {B.name}: back to back; one stays in its shell, the other runs without knowing towards what.
+When {A.name} comes first, fulfilment becomes a cage looking backwards, and {B.name} runs off towards nothing.
+{A.name} before {B.name}: one no longer moves, the other no longer stops. Where is your still part, where your flight?
+{A.name} looks to the past, {B.name} walks away: a success that shuts in drives the energy to flee.
+In this order {A.name} and {B.name} don't see each other: what is finished holds back, what is free escapes.
+{A.name} then {B.name}: the whole turns its back on the traveller; perhaps the way on starts by leaving the circle.
+[couple.1-11]
+{A.name} then {B.name}: back to back, each begins on home ground, and the balance holds.
+{A.name} looks at his tools, {B.name} at her lion: two beginnings that respect each other without mixing.
+In this order mind and instinct start together, each in its own place: {A.name} and {B.name} back each other from afar.
+{A.name} first, {B.name} after: skill looks after the world, strength after the depths, and nothing collides.
+{A.name} and {B.name} turn their backs like two partners who trust each other: each a field, one new energy.
+{A.name} before {B.name}: the first degree is lived twice, outside and inside, with neither treading on the other.
+[couple.11-1]
+{A.name} then {B.name}: they face each other and each meddles in the other's field; nothing moves.
+When {A.name} comes first, instinct wants the tools and skill wants to tame the lion: a stalemate.
+{A.name} looks at {B.name}, who looks back: two beginnings watching each other instead of starting.
+{A.name} before {B.name}: each corrects the other, and the new energy wears itself out in advice.
+In this order {A.name} and {B.name} fight over one field: giving each their own would set everything going.
+{A.name} then {B.name}: face to face, two new forces in each other's way; who begins, and where?
+[couple.2-5]
+{A.name} then {B.name}: back to back, they lean on each other and each looks out to the world.
+{A.name} keeps the book, {B.name} blesses the crowd: a couple that supports itself without turning inward.
+In this order study and teaching turn their backs the better to serve: each carries half the task.
+{A.name} first, {B.name} after: what brooded in secret finds a voice turned towards others.
+{A.name} and {B.name} stand back to back like two pillars: their shared strength goes outwards.
+{A.name} before {B.name}: mother and father of the spirit don't look at each other; together they look at what is to be handed on.
+[couple.5-2]
+{A.name} then {B.name}: face to face, they have eyes only for each other, and the world waits for their word.
+When {A.name} comes first, the spiritual couple closes up: a perfect dialogue that forgets its mission.
+{A.name} looks at {B.name}, who looks back: knowledge and teaching circle inside a closed room.
+{A.name} before {B.name}: a precious complicity, as long as the door opens to others again.
+In this order {A.name} and {B.name} are enough for each other: what they know doesn't leave the temple.
+{A.name} then {B.name}: two wisdoms contemplating each other; who is their gift for?
+[couple.3-4]
+{A.name} then {B.name}: he turns his eyes to her; the creative surge finds ground to settle on.
+{B.name} looks at {A.name}: the idea that springs up and the hand that builds can bring something to birth.
+In this order spirit comes down into matter: {A.name} invents, {B.name} watches over what she invents.
+{A.name} first, {B.name} after: spring and law agree, and the concrete world takes shape.
+With {A.name} then {B.name}, the two eagles answer each other: what is born finds someone to shelter it.
+{A.name} before {B.name}: authority looks at creation with interest, and creation gains a lasting form.
+[couple.4-3]
+{A.name} then {B.name}: he turns his back on her; what holds them together is what they own.
+When {A.name} comes first, order no longer looks at creation: a quarrel under one roof.
+{A.name} looks elsewhere, {B.name} overflows alone: power and impulse fight over the house.
+{A.name} before {B.name}: two thrones, two eagles, but no more exchange; where did the gaze go?
+In this order {A.name} and {B.name} turn their backs: law without fancy, fancy without support.
+{A.name} then {B.name}: the structure holds, the desire leaves; one look could set it all going again.
+[couple.7-17]
+{A.name} then {B.name}: she turns her gesture towards him, and he carries her work out along the world's roads.
+{B.name} pours, {A.name} carries: what she gives on the spot travels thanks to him.
+In this order the conqueror becomes a messenger: {A.name} makes known what {B.name} offers.
+{A.name} first, {B.name} after: action finds a spring, and the spring a road.
+With {A.name} then {B.name}, the seventh degree stands twice: acting far away, feeding here.
+{A.name} before {B.name}: the prince no longer conquers for himself; he carries far the generosity at his side.
+[couple.17-7]
+{A.name} then {B.name}: almost the same alliance, but the chariot stops on the ground where she pours.
+When {A.name} comes first, the conqueror lays down his arms with her: his movement becomes a gift.
+{A.name} before {B.name}: the prince's ride ends at the spring's edge; not a failure, an offering.
+In this order {B.name} comes to give himself where {A.name} is already giving: two generosities in one place.
+{A.name} then {B.name}: action joins the gift and rests there; what you win can also be offered.
+{A.name} first, {B.name} after: the journey ends on fertile ground, and that is luck.
+[couple.8-9]
+{A.name} then {B.name}: he looks at her while backing into the unknown, and helps her out of her perfection.
+{B.name} turns his lantern towards {A.name}: judgement softens and becomes understanding.
+In this order balance achieved agrees to move: {B.name} opens a fertile crisis in what {A.name} holds level.
+{A.name} first, {B.name} after: she stops cutting and understands; he stops wandering and gives light.
+With {A.name} then {B.name}, perfection lets doubt in, and grows more alive for it.
+{A.name} before {B.name}: the old man frees the demanding mother from her sword; measure becomes wisdom.
+[couple.9-8]
+{A.name} then {B.name}: he backs towards her and runs into her sword; the past closes over him.
+When {A.name} comes first, his backward walk meets a judgement that stops it.
+{A.name} looks back, {B.name} bars his way: wisdom shuts itself up in what it has already understood.
+{A.name} before {B.name}: the crisis looks for a way out and finds a rule; perhaps the rule can bend.
+In this order doubt and perfection freeze together: neither dares to change yet.
+{A.name} then {B.name}: the lantern lights the past, the sword guards the door; where is the passage?
+[couple.18-19]
+{A.name} then {B.name}: night opens onto day, and "me" becomes "we".
+After {A.name}, {B.name} rises: what was dreamed alone is built by two.
+In this order intuition comes out of the shadow: {B.name} gives a warm form to what {A.name} sensed.
+{A.name} first, {B.name} after: worry dissolves into a shared light.
+{A.name} before {B.name}: the cosmic mother makes way for the father; mystery becomes a home.
+With {A.name} then {B.name}, the road runs from night to day: what you carried alone finds companions.
+[couple.19-18]
+{A.name} then {B.name}: day goes down into night; what was clear becomes mystery again.
+When {A.name} comes first, warmth withdraws into dream: active and receptive swap places.
+{A.name} before {B.name}: building gives way to intuition, and perhaps it is a time to listen.
+In this order the cosmic father makes way for the mother: "we" becomes "me" again.
+{A.name} then {B.name}: the light sets; in the shadow something else is being prepared.
+{A.name} first, {B.name} after: the roles trade places, the one who gave begins to receive.
+[couple.0-21.any]
+{A.name} and {B.name} stand at the two ends of the road: energy without form and the whole that receives it.
+With {A.name} and {B.name}, the first impulse meets its fulfilment: the question is which way you are walking.
+{A.name} and {B.name} are the couple of the first step and the last: a free force and a world to land in.
+The traveller without a number and the dancer of XXI answer each other: your energy is looking for a place to come true.
+{A.name} brings the impulse, {B.name} offers the place: a force can go all the way to the end of itself.
+Between {A.name} and {B.name} lies the whole Tarot: what sets out and what arrives are cut from the same cloth.
+[couple.1-11.any]
+{A.name} and {B.name} begin together: one with his tools, the other with her instinct.
+Two beginnings that understand each other, {A.name} and {B.name}: the skill of the mind, the strength of the belly.
+With {A.name} and {B.name} the first degree doubles: one beginning in the world, another in the body.
+{A.name} combines, {B.name} tames: two fresh talents, each on home ground, respecting each other.
+I and XI wear the same hat, curved like an eight: one new energy, two ways of living it.
+{A.name} and {B.name} carry the same new energy, once turned outwards, once towards the depths.
+[couple.2-5.any]
+{A.name} and {B.name} are the spiritual couple of the Tarot: the closed book and the blessing hand.
+With {A.name} and {B.name}, what brooded in silence finds a voice and can be shared.
+The mother and father of the spirit, {A.name} and {B.name}: study on one side, teaching on the other.
+{A.name} gathers, {B.name} connects: together they turn a secret into a useful word.
+This couple isn't after passion: {A.name} and {B.name} serve something greater, together.
+Between {A.name} and {B.name}, the second and fifth degrees join forces: gestation becomes a shared ideal.
+[couple.3-4.any]
+{A.name} and {B.name}, mother and father of the material world: the surge that creates and the hand that steadies.
+With {A.name} and {B.name}, the explosion finds a form: what bursts out can finally last.
+Two eagles, two thrones: {A.name} makes things spring up, {B.name} makes them hold, and the world takes shape.
+{A.name} invents, {B.name} builds: together they help what was just born to stand.
+III and IIII are the couple of creative power: imagination and law join hands.
+Between {A.name} and {B.name}, spring meets the harvest season: nothing is lost if they agree.
+[couple.7-17.any]
+{A.name} and {B.name}, the two faces of the seventh degree: conquering the world, and feeding it.
+With {A.name} and {B.name}, action turns outwards: one travels, the other gives from where she is.
+The prince who rides on and the woman who pours: {A.name} and {B.name} act, each in their own way.
+{A.name} carries far what {B.name} offers on the spot: together their action reaches the whole world.
+VII and XVII make a couple of action: movement and giving lend each other strength.
+Between {A.name} and {B.name} there is nothing to win from each other: their energy turns to the world.
+[couple.8-9.any]
+{A.name} and {B.name}: the perfection that weighs and the crisis that opens a way through.
+With {A.name} and {B.name}, balance achieved meets fertile doubt: neither can stay frozen.
+She cuts, he searches: {A.name} and {B.name} are the couple of rigour and wisdom.
+{A.name} gives the measure, {B.name} gives the light: together they keep perfection from turning to stone.
+VIII and VIIII answer each other: what is perfect must one day agree to change.
+Between {A.name} and {B.name}, the mother who judges and the old man who doubts learn from each other.
+[couple.18-19.any]
+{A.name} and {B.name}, the two great lights of the Tarot: the night that receives, the day that gives.
+With {A.name} and {B.name}, intuition and the love that builds shed light on each other.
+The cosmic mother and father, {A.name} and {B.name}: mystery and warmth brought together.
+{A.name} reflects what {B.name} radiates: together they make the full cycle of light.
+XVIII and XVIIII are the couple of night and day: nothing is fully seen without both.
+Between {A.name} and {B.name}, the dream finds firm ground to build on.
+[meet.1-2]
+{A.name} dares, {B.name} knows: what she ripened in silence finally finds hands to act.
+The knowledge {B.name} has brooded starts to move through {A.name}: the pupil brings the lesson to life.
+{A.name} brings daring, {B.name} depth: an apprenticeship in which both receive.
+[meet.2-1]
+{A.name} becomes an idol, {B.name} a believer: fervour takes the place of action.
+When {A.name} goes first, {B.name} stays at school and doesn't dare take his life in hand.
+{A.name} sits enthroned, {B.name} kneels: a bond that keeps the impulse childish while he kneels.
+[meet.1-3]
+{A.name} stays free, {B.name} loves him for his daring: two free impulses that feed each other.
+With {B.name} beside him, {A.name} sees his table grow: creation gives weight to first steps.
+{A.name} begins, {B.name} makes it bloom: a beginner carried by an abundance that doesn't bind him.
+[meet.3-1]
+{A.name} is already overflowing, {B.name} barely starting: the gap can turn into dependence.
+When {A.name} comes first, {B.name} shrinks before so much brilliance, and risks being scorned.
+{A.name} reigns, {B.name} gazes open-mouthed: so much brilliance makes him forget his own tools.
+[meet.1-17]
+{A.name} is still searching, {B.name} has found herself: what she pours, he learns to pass on.
+{A.name} then {B.name}: the beginner drinks from a spring that isn't his, and shares it.
+Before {B.name}, {A.name} finds that giving is an art: his skill goes into the service of the gift.
+[meet.17-1]
+{A.name} then {B.name}: he thinks he's the source of what she pours; she gently lets him.
+When {A.name} comes first, {B.name} fusses beside a gift beyond him: humility is called for.
+{A.name} receives from the sky; {B.name} would like her to receive from him: an illusion to smile at.
+[meet.1-21]
+{A.name} walks towards {B.name}: everything the beginner sensed is waiting for him, fulfilled.
+{A.name} then {B.name}: the first gesture finds its whole form; the apprentice reaches his work.
+With {A.name} then {B.name}, the tool becomes a work: what you begin already carries its happy end.
+[meet.21-1]
+{A.name} before {B.name}: fulfilment seems so far off that the beginner no longer dares to start.
+When {A.name} comes first, each sees in the other their own obstacle: seeing it is a first step.
+{A.name} then {B.name}: success is behind, everything is to be done again, and a small beginning counts.
+[meet.2-4]
+{A.name} broods, {B.name} keeps watch: study finds the concrete security it needed.
+{A.name} then {B.name}: inner life leans on a steady hand, and order gains a meaning.
+{B.name} stands guard, {A.name} carries on her secret work: spirit and matter support each other.
+[meet.4-2]
+{A.name} then {B.name}: power takes knowledge as a tool, and the sacred becomes merely useful.
+When {A.name} comes first, {B.name} feels cramped: her mind serves someone else's power.
+{A.name} rules the earth, {B.name} lends him her learning: the gestation stops halfway.
+[meet.2-7]
+{A.name} then {B.name}: the prince's ardour finds its direction in a wisdom wider than he is.
+{A.name} gives the meaning, {B.name} the speed: the conqueror rides for a cause greater than himself.
+With {A.name} behind him, {B.name} no longer conquers for himself: he carries a message.
+[meet.7-2]
+{A.name} then {B.name}: ambition dresses up as the sacred; fine reasons can hide an appetite.
+When {A.name} comes first, {B.name} becomes a banner, waved more than listened to.
+{A.name} conquers, {B.name} blesses: an alliance of interests where each thinks they serve the other.
+[meet.2-9]
+{A.name} and {B.name} understand each other without a word: two solitudes on the same quest.
+{A.name} draws near the world, {B.name} draws away: they cross halfway and hold each other in esteem.
+{A.name} then {B.name}: the book and the lantern light each other, a bond of the mind.
+[meet.9-2]
+{A.name} then {B.name}: the one who was leaving lets himself be held; retreat becomes home.
+When {A.name} comes first, {B.name} offers him a place, and he gives up his solitary road.
+{A.name} steps back and finds {B.name}: his crisis finds shelter, at the cost of some freedom.
+[meet.2-19]
+{A.name} then {B.name}: what she prepared in the shade receives its light, and can spread.
+Under {B.name}, {A.name} comes out of her reserve: her knowledge becomes a love offered to all.
+{A.name} meets {B.name}, the cosmic father: what she was carrying finally comes into the world.
+[meet.19-2]
+{A.name} then {B.name}: dazzled, she sees only him, and the world waits for her work.
+When {A.name} comes first, {B.name} loses herself in contemplation: much fervour, few deeds.
+{A.name} before {B.name}: adoration shuts her in, but a song may be born of that silence.
+[meet.3-5]
+{A.name} then {B.name}: creation finds an ideal to serve, and the master a fervent pupil.
+{A.name} invents, {B.name} raises up: what bursts out learns to aim higher than itself.
+{A.name} brings the sap, {B.name} the meaning: youth gives strength back to wisdom.
+[meet.5-3]
+{A.name} then {B.name}: the master sees the world through other eyes and forgets his pulpit a little.
+When {A.name} comes first, {B.name} refuses to be a pupil: she wants an equal, not a master.
+{A.name} then {B.name}: if the teacher steps down from his pulpit, their understanding bears fruit.
+[meet.5-17]
+{A.name} then {B.name}: the word of the temple and the gesture at the spring answer each other endlessly.
+{A.name} blesses what {B.name} pours: heaven and earth find a common language.
+{A.name} meets {B.name}: two generosities, one that teaches, one that waters.
+[meet.17-5]
+{A.name} then {B.name}: they turn their backs, each faithful to a task, without disowning the other.
+When {A.name} comes first, {B.name} doesn't try to guide her: two right paths, side by side.
+{A.name} then {B.name}: two servants of the same sky, each turned towards a separate work.
+[meet.5-18]
+{A.name} then {B.name}: the teacher serves a mystery greater than his words.
+Before {B.name}, {A.name} finds he is only a messenger: he watches over the night instead of steering it.
+{A.name} meets {B.name}: speech bows before what it cannot say.
+[meet.18-5]
+{A.name} before {B.name}: what the night knew, speech wants to explain, and the mystery grows poorer.
+When {A.name} comes first, {B.name} becomes a ferryman: visions turn into teaching.
+{A.name} then {B.name}: the mystery finds a voice, at the risk of being over-explained.
+[meet.3-7]
+{A.name} then {B.name}: two young forces, one rooted, one on the road; nothing stands in their way.
+{A.name} creates from her throne, {B.name} carries that force out onto the roads.
+{A.name} founds a kingdom, {B.name} pushes back its borders: an almost perfect understanding.
+[meet.7-3]
+{A.name} then {B.name}: two successes that are enough in themselves; they talk from afar.
+When {A.name} comes first, one leaves and the other stays: they meet rarely, but intensely.
+{A.name} then {B.name}: they don't look at each other; the bond runs through the mind, not the eyes.
+[meet.3-9]
+{A.name} then {B.name}: enthusiasm and experience keep each other company, despite the gap.
+{A.name} brings life, {B.name} distance: each receives from the other what age denies them.
+{A.name} meets {B.name}: impulse learns patience, solitude finds a little warmth again.
+[meet.9-3]
+{A.name} then {B.name}: they hold on through a shared lack; together, but without direction.
+When {A.name} comes first, {B.name} rekindles what was going out, asking nothing in return.
+{A.name} then {B.name}: two ages that everything separates, and that respect each other: their bond.
+[meet.3-19]
+{A.name} then {B.name}: the creative surge stops building an empire and becomes shared warmth.
+Under {B.name}, {A.name} stops ruling in order to love: her creation finds a wider centre.
+{A.name} meets {B.name}: enthusiasm at last finds something to devote itself to.
+[meet.19-3]
+{A.name} then {B.name}: she would keep for herself a light made for everyone.
+When {A.name} comes first, {B.name} withdraws behind her shield: love turns to possession.
+{A.name} before {B.name}: wanting to be the only one, she risks fading into his rays.
+[meet.4-17]
+{A.name} then {B.name}: order cuts paths for the gift, which goes further than it would alone.
+{A.name} organizes what {B.name} pours out: generosity gains a lasting form.
+{A.name} meets {B.name}: matter serves living water, and the world gains by it.
+[meet.17-4]
+{A.name} then {B.name}: he wants to direct what flows of itself; living water obeys no one.
+When {A.name} comes first, {B.name} wants to be the source: he draws to himself a gift meant for all.
+{A.name} then {B.name}: if he protects her, all is well; if he channels her to himself, the gift dwindles.
+[meet.4-18]
+{A.name} then {B.name}: the law agrees to listen to the night, and governs differently.
+With {B.name} beside him, {A.name} changes: his order grows less certain and more inspired.
+{A.name} meets {B.name}: stone and dream join forces, and nothing stays entirely reasonable.
+[meet.18-4]
+{A.name} before {B.name}: the night wins, and the ground gives way beneath the throne.
+When {A.name} comes first, {B.name} leaves solid ground: she is the one who runs the house.
+{A.name} then {B.name}: intuition reigns, structure dissolves; one foot on the earth would help.
+[meet.7-18]
+{A.name} then {B.name}: conquest meets a night that no army can take.
+{A.name} moves towards {B.name}: the traveller learns to be guided by what he cannot see.
+{A.name} meets {B.name}: outward action finds its depth, or loses its way there.
+[meet.18-7]
+{A.name} before {B.name}: the prince leaves the world behind to conquer the mystery, at his own risk.
+When {A.name} comes first, {B.name} wants to possess what cannot be possessed: wisdom or shipwreck.
+{A.name} then {B.name}: all the force of conquest throws itself into the unknown, and the reins hang loose.
+[meet.9-17]
+{A.name} then {B.name}: the sage, done with everything, rests beside the spring.
+{A.name} steps back towards {B.name}: his wisdom becomes simple again, as simple as poured water.
+{A.name} meets {B.name}: the one who gives helps the one who knows to pass it on.
+[meet.17-9]
+{A.name} before {B.name}: the sage's doubt troubles the gesture of the one who gives.
+When {A.name} comes first, {B.name} makes her think about what should flow of itself.
+{A.name} then {B.name}: the gift hesitates under a gaze that weighs everything; yet it is worth pouring.
+[meet.9-18]
+{A.name} then {B.name}: wisdom dares to go down into the dream without drowning.
+{A.name} carries his lantern into the realm of {B.name}: the unconscious becomes legible.
+{A.name} meets {B.name}: one who has crossed everything keeps the night company, without trying to empty it.
+[meet.18-9]
+{A.name} before {B.name}: the night overwhelms the sage, who loses his calm.
+When {A.name} comes first, {B.name} gets lost in what he meant to light.
+{A.name} then {B.name}: intuition overflows thought; not everything lets itself be understood.
+[meet.1-8]
+{A.name} then {B.name}: the apprentice before a perfect mother; her sword keeps each in their place.
+Before {B.name}, {A.name} stays a child who learns: the rule protects him without merging him into it.
+{A.name} begins, {B.name} gives the measure: demand frames the impulse without smothering it.
+[meet.8-1]
+{A.name} then {B.name}: he contemplates her as his fulfilment; the risk is melting into her.
+When {A.name} comes first, {B.name} looks for his perfection in someone else's eyes.
+{A.name} before {B.name}: the pupil measures himself against an ideal beyond him; tenderness or fusion.
+[meet.1-18]
+{A.name} then {B.name}: the night's mystery opens the skilful one; he becomes a poet.
+Before {B.name}, {A.name} lets his tools speak to the dream: an inspired creation.
+{A.name} meets {B.name}: skill learns to listen to the unknown, and gains a soul.
+[meet.18-1]
+{A.name} then {B.name}: an immense psyche floods hands that are still fragile.
+When {A.name} comes first, {B.name} gets lost in waters too deep for him.
+{A.name} before {B.name}: the dream overflows the apprentice; one step at a time, on firm ground.
+[meet.4-11]
+{A.name} then {B.name}: order gives means to the new impulse, and the impulse gives life back to order.
+{A.name} structures, {B.name} enlivens: her projects find a frame, his power finds breath again.
+{A.name} meets {B.name}: stone and instinct join forces, and each gains by it.
+[meet.11-4]
+{A.name} then {B.name}: face to face, two powers in a contest; a shared task would calm them.
+When {A.name} comes first, instinct challenges authority: a struggle over who is in charge.
+{A.name} before {B.name}: strong together, but only around one shared work.
+[meet.5-11]
+{A.name} then {B.name}: he gives a form, she gives a voice; ideal and instinct talk to each other.
+{A.name} looks towards {B.name}: the temple's word welcomes animal strength without disowning it.
+{A.name} meets {B.name}: teaching takes on a body, instinct takes on a meaning.
+[meet.11-5]
+{A.name} then {B.name}: her drive is asked to rise higher; a sublimation that feels like a constraint.
+When {A.name} comes first, {B.name} wants to convert a force that only asked to live.
+{A.name} before {B.name}: instinct follows a master looking elsewhere; how much of it stays alive?
+[meet.7-11]
+{A.name} then {B.name}: action outside, mastery inside; one courage on two floors.
+{A.name} conquers the world, {B.name} tames what growls below: they lack nothing.
+{A.name} meets {B.name}: the outer victory rests on a tamed strength.
+[meet.11-7]
+{A.name} then {B.name}: instinct runs ahead of spirit, and the chariot follows without holding the reins.
+When {A.name} comes first, the belly's strength decides before the head: a strong impulse, poorly steered.
+{A.name} before {B.name}: the lion pulls the chariot; the question is who chooses the road.
+[meet.9-11]
+{A.name} then {B.name}: a light that doubts and a darkness that knows; together they lift each other up.
+{A.name} searches with his lantern, {B.name} knows with her body: two knowledges that complete each other.
+{A.name} meets {B.name}: experience and fresh instinct turn their backs the better to support each other.
+[meet.11-9]
+{A.name} then {B.name}: face to face, each invades the other's ground; a crisis that forces a choice.
+When {A.name} comes first, new strength and tired wisdom get in each other's way.
+{A.name} before {B.name}: instinct jostles distance, distance brakes instinct; who can give way?
+[meet.11-19]
+{A.name} then {B.name}: her solitary work with the lion meets the warmth of a cosmic father.
+{A.name} looks towards {B.name}: inner strength comes out of the shadow and lets itself be warmed.
+{A.name} meets {B.name}: tamed instinct finds a sun to shine for.
+[meet.19-11]
+{A.name} then {B.name}: she withholds herself from the light; a reproach that hides a wish to be loved.
+When {A.name} comes first, {B.name} keeps her strength to herself, as if to say "you didn't see me".
+{A.name} before {B.name}: warmth is offered, instinct sulks; behind the resentment, a need for love.
+[meet.5-8]
+{A.name} then {B.name}: he puts himself at the service of a perfection; a guide with a fair ideal.
+{A.name} looks towards {B.name}: teaching leans on measure, and grows more upright.
+{A.name} meets {B.name}: the word that connects obeys what is just, not itself.
+[meet.8-5]
+{A.name} then {B.name}: he walks in front, she supports from behind; his authority rests on her rigour.
+When {A.name} comes first, {B.name} speaks in public of a justice she practises in silence.
+{A.name} before {B.name}: the scales set the rule, the bridge connects; each a role, in front or behind.
+[meet.4-8]
+{A.name} then {B.name}: perfection on earth, then in the sky; a bond of power more than of love.
+{A.name} builds, {B.name} weighs: order submits to a higher measure, without tenderness.
+{A.name} meets {B.name}: two demands that add up; solid, but a little cold.
+[meet.8-4]
+{A.name} then {B.name}: he looks at her and wants to master what is above him; the scales won't be ruled.
+When {A.name} comes first, {B.name} claims to reign over the law itself.
+{A.name} before {B.name}: earthly power measures itself against a higher justice; humility or conflict.
+[meet.7-8]
+{A.name} then {B.name}: she hands him her sword; a double-edged gift.
+{A.name} advances, {B.name} arms him with discernment: conquest becomes just, or merciless.
+{A.name} meets {B.name}: the impulse receives a rule; up to him to make it a tool, not a weapon.
+[meet.8-7]
+{A.name} then {B.name}: she judges, he slows; demand brakes the conqueror.
+When {A.name} comes first, {B.name} only moves forward under a gaze that weighs every step.
+{A.name} before {B.name}: measure holds back the ride; useful caution, or one brake too many?
+[meet.17-19]
+{A.name} then {B.name}: her nostalgia dissolves in the warmth; a couple turned towards others.
+{A.name} pours, {B.name} shines: the gift finds a light that ripens it for everyone.
+{A.name} meets {B.name}: the spring's water joins the river the twins are crossing.
+[meet.19-17]
+{A.name} then {B.name}: she worships him to the point of isolation; the gift folds back onto an idol.
+When {A.name} comes first, {B.name} pours everything towards him and forgets the rest of the world.
+{A.name} before {B.name}: an adoration that separates; light is made to circulate.
+[meet.8-19]
+{A.name} then {B.name}: her verdicts become luminous; justice warms up.
+{A.name} weighs, {B.name} lights up: measure learns kindness.
+{A.name} meets {B.name}: two frontal gazes, one demanding, one warm, that come to agree.
+[meet.19-8]
+{A.name} then {B.name}: warmth finds the rule narrow, the rule finds warmth naive.
+When {A.name} comes first, {B.name} measures what can't be measured: generosity feels judged.
+{A.name} before {B.name}: two forces that diminish each other; seeing the other's worth could change everything.
+[succ.12-13]
+{A.name} then {B.name}: everything held back bursts out at last; what comes of it isn't known yet.
+After the stop, the great change: {A.name} prepares, {B.name} sets free, and the new form is still searching.
+{A.name} before {B.name}: the still seed becomes a shoot; a transformation begins, with no plan.
+In this order waiting bears fruit: {B.name} brings into the open what {A.name} was keeping.
+[succ.13-12]
+{A.name} then {B.name}: the drive to transform runs against a dam; frustration rises.
+When {A.name} comes first, the change you want meets a stillness: an anger looking for a way out.
+{A.name} before {B.name}: the force that clears finds itself suspended; what can it do with this waiting?
+In this order everything pushes and nothing gets through: {B.name} holds back what {A.name} would sweep away.
+[succ.13-14]
+{A.name} then {B.name}: after the great clearing, circulation returns; the forces mix again.
+When {A.name} comes first, {B.name} tends what was cut: change finds its measure.
+{A.name} before {B.name}: the turned earth lets itself be watered; what was cut can heal.
+In this order the radical impulse calms: the freed energy finds a rhythm and a balance.
+[succ.14-13]
+{A.name} then {B.name}: measure is no longer enough; what you wanted to soothe asks for a real change.
+When {A.name} comes first, patience meets a force that cuts: perhaps it is time to act.
+{A.name} before {B.name}: the gentle mixing clouds over, a long-tempered anger wants out.
+In this order balance falls back into the building site: before healing, something is still to be cleared.
+[succ.15-16]
+{A.name} then {B.name}: hidden forces rise into the day; what was secret is said, and it cleanses.
+When {A.name} comes first, buried passion finds a joyful way out: a creative burst, perhaps a celebration.
+{A.name} before {B.name}: the ties come loose, energy from the depths rises and shows itself.
+In this order what smouldered underground bursts outside: awkward or joyful, it is a stage that washes clean.
+[succ.16-15]
+{A.name} then {B.name}: after the burst the energy comes back down and binds itself; a great passion, or a tie hard to undo.
+When {A.name} comes first, the freed joy returns to the depths and takes root there.
+{A.name} before {B.name}: what had just come out ties itself up again; look at what draws you, and at what cost.
+In this order the impulse of the festival feeds the underground fire: a creative force, if you keep your eyes open.
+[succ.16-17]
+{A.name} then {B.name}: once the walls are open, you find your place under the open sky, and you can give.
+When {A.name} comes first, the bursting prepares the gift: what came out settles and feeds the earth.
+{A.name} before {B.name}: after the shock, a calm nakedness; nothing left to hide, everything to offer.
+In this order the joy that blew off the roof becomes a spring: the freed energy begins to flow.
+[succ.17-16]
+{A.name} then {B.name}: the place you found begins to shake; what you thought settled asks to move again.
+When {A.name} comes first, the quiet gift turns into a burst: a generosity overflowing its walls.
+{A.name} before {B.name}: the spring is no longer enough, something wants out more strongly; welcome the shake.
+In this order the peace you found goes back to the building site: perhaps it was only a stage.
+[succ.20-21]
+{A.name} then {B.name}: the call is heard and comes true; a full success, on every level.
+When {A.name} comes first, deep desire can find its whole satisfaction: what was calling takes form.
+{A.name} before {B.name}: the new consciousness enters the world, and the four drives of the being meet.
+In this order the angel calls and the dancer answers: what is reborn finds room to open out.
+[succ.21-20]
+{A.name} then {B.name}: the end sits at the start; the impulse stays caught in its shell. The third card shows the way out.
+When {A.name} comes first, the call can't lift the stone: a hard birth, not an impossible one.
+{A.name} before {B.name}: everything seems finished before it began; look at the other card, it opens a door.
+In this order {A.name} encloses {B.name}, who wanted to be reborn: nothing is final, the rest of the row shows the passage.
+[succ.10-11]
+{A.name} then {B.name}: the cycle stops and a new force takes the crank; the end becomes a beginning.
+When {A.name} comes first, the circle opens into a spiral: what went round in circles finds an unknown energy.
+{A.name} before {B.name}: the impasse itself pushes you to go down for a deeper resource.
+In this order the stop serves as a springboard: what blocked calls up a creativity you hadn't imagined.
+[succ.11-10]
+{A.name} then {B.name}: the new force runs up against a motionless wheel; the impulse waits for a hand to start again.
+When {A.name} comes first, deep energy shuts itself into a repeating cycle.
+{A.name} before {B.name}: what was waking falls back into routine; what could set the wheel turning again?
+In this order instinct goes round in circles: the power is there, it lacks a direction.
+[succ.10-1]
+{A.name} then {B.name}: a cycle closes and an apprentice takes everything up again from the table; the new start has tools.
+When {A.name} comes first, gathered experience turns into a first step: everything is to be done again, but you already know something.
+{A.name} before {B.name}: the wheel stops, the wand rises; the end of the series becomes its beginning.
+In this order what was exhausted becomes possible again: out of the end comes a new choice.
+[succ.1-10]
+{A.name} then {B.name}: from first step to cycle's end, the whole road at once; the apprentice meets the riddle.
+When {A.name} comes first, what begins is already going round in circles: the middle steps are missing.
+{A.name} before {B.name}: the fresh talent arrives at a stopped wheel; perhaps it is time to learn to wait, or to ask for help.
+In this order the whole series fits in two cards: a promise and its end, without the road between.
+[kin.sum21.0-21]
+{A.name} and {B.name} make twenty-one: energy and the vessel that receives it, each useless without the other.
+Added together, {A.name} and {B.name} make twenty-one: a force with no outline and a form that awaits it.
+Twenty-one between {A.name} and {B.name}: pure impulse and fulfilment read together, like a chord.
+[kin.sum21.1-20]
+{A.name} and {B.name} make twenty-one: the seeker meets the call of a new consciousness.
+Added together, {A.name} and {B.name} give twenty-one: the quest becomes a rebirth.
+Twenty-one between {A.name} and {B.name}: the first gesture and the great awakening answer each other.
+[kin.sum21.2-19]
+{A.name} and {B.name} make twenty-one: cloistered study finds the light, and a voice to speak it.
+Added together, {A.name} and {B.name} give twenty-one: what brooded in the shade ripens in the sun.
+Twenty-one between {A.name} and {B.name}: the secret of the book becomes shared warmth.
+[kin.sum21.3-18]
+{A.name} and {B.name} make twenty-one: boundless creation meets bottomless receptivity.
+Added together, {A.name} and {B.name} give twenty-one: fuse and powder; impulse and dream catch fire together.
+Twenty-one between {A.name} and {B.name}: what springs up and what welcomes make one movement.
+[kin.sum21.4-17]
+{A.name} and {B.name} make twenty-one: rule meets abundance; one learns humility, the other finds a riverbed.
+Added together, {A.name} and {B.name} give twenty-one: stone and living water build together.
+Twenty-one between {A.name} and {B.name}: power learns to serve the gift, and the gift gains a form.
+[kin.sum21.5-16]
+{A.name} and {B.name} make twenty-one: the temple learns joy, and joy becomes sacred.
+Added together, {A.name} and {B.name} give twenty-one: teaching opens to celebration, celebration finds a meaning.
+Twenty-one between {A.name} and {B.name}: the word that connects and the burst that frees bless each other.
+[kin.sum21.6-15]
+{A.name} and {B.name} make twenty-one: chosen love and the passion that imposes itself, together a whole love life.
+Added together, {A.name} and {B.name} give twenty-one: the light of choice and the shadow of desire complete each other.
+Twenty-one between {A.name} and {B.name}: what pleases the heart and what burns beneath make one taste for life.
+[kin.sum21.7-14]
+{A.name} and {B.name} make twenty-one: conquest outside receives the blessing of an inner measure.
+Added together, {A.name} and {B.name} give twenty-one: action that advances and calm that protects.
+Twenty-one between {A.name} and {B.name}: movement in space and healing in time answer each other.
+[kin.sum21.8-13]
+{A.name} and {B.name} make twenty-one: perfection learns to change, and the great clearing finds a form.
+Added together, {A.name} and {B.name} give twenty-one: balance accepts transformation, transformation finds its rule.
+Twenty-one between {A.name} and {B.name}: what is just and what renews need each other.
+[kin.sum21.9-12]
+{A.name} and {B.name} make twenty-one: the long search and total surrender meet in one not-knowing.
+Added together, {A.name} and {B.name} give twenty-one: the lantern of one lights the silence of the other.
+Twenty-one between {A.name} and {B.name}: the one who walks and the one who stops reach the same threshold.
+[kin.sum21.10-11]
+{A.name} and {B.name} make twenty-one: the end that is a beginning, the very heart of the eleven paths.
+Added together, {A.name} and {B.name} give twenty-one: the circle that was turning opens into a spiral.
+Twenty-one between {A.name} and {B.name}: what stops and what wakes are one gesture.
+[kin.same.1-11]
+{A.name} and {B.name}, one degree: a beginning in words and tools, another in instinct; alone, one stays shallow, the other falls silent.
+{A.name} begins in the world, {B.name} in the depths: the first degree needs both its faces.
+The same hat for {A.name} and {B.name}: skill and animal strength are one new energy, on two floors.
+[kin.same.2-12]
+{A.name} and {B.name}, one degree: the egg she broods and the hanging child; study and surrender carry one gestation.
+{A.name} prepares through knowledge, {B.name} through letting go: alone, one sets into dogma, the other into inertia.
+The second degree twice, {A.name} and {B.name}: gathering outside, waiting inside, and letting it ripen.
+[kin.same.3-13]
+{A.name} and {B.name}, one degree: sowing and weeding; the surge that makes things grow and the force that clears the ground.
+{A.name} creates without counting, {B.name} clears the field: alone, one overflows, the other leaves the earth bare.
+The third degree twice, {A.name} and {B.name}: explosion in the world and mutation within, one spring.
+[kin.same.4-14]
+{A.name} and {B.name}, one degree: stability on earth and peace within; one does not hold without the other.
+{A.name} secures the ground, {B.name} the heart: alone, one turns authoritarian, the other dreams without footing.
+The fourth degree twice, {A.name} and {B.name}: a throne and an inner balance, one security on two levels.
+[kin.same.5-15]
+{A.name} and {B.name}, one degree: the lotus and its mud; the ideal that lifts and the desire that roots.
+{A.name} points to the sky, {B.name} to the depths: alone, one becomes utopia, the other excess.
+The fifth degree twice, {A.name} and {B.name}: a bridge upwards, a bridge downwards, one crossing.
+[kin.same.6-16]
+{A.name} and {B.name}, one degree: chosen union and joyful opening; pleasure on earth and pleasure from the sky.
+{A.name} joins, {B.name} frees: alone, one becomes an island for two, the other a euphoria that scatters.
+The sixth degree twice, {A.name} and {B.name}: the sky's first intervention, once gently, once in a burst.
+[kin.same.7-17]
+{A.name} and {B.name}, one degree: conquering and cultivating; alone, one wins without growing anything, the other gives until it floods.
+The stars of the canopy and those of the sky, {A.name} and {B.name}: action in the world and action for the world.
+The seventh degree twice: {A.name} goes out, {B.name} feeds where she is, one acting force.
+[kin.same.8-18]
+{A.name} and {B.name}, one degree: two perfections, law and reflection; alone, one turns intolerant, the other anxious.
+{A.name} weighs, {B.name} receives: clear balance and the mystery of night, two faces of one mother.
+The eighth degree twice, {A.name} and {B.name}: measure outside, intuition within.
+[kin.same.9-19]
+{A.name} and {B.name}, one degree: crisis and renewal; alone, one keeps its light to itself, the other spreads it without choosing.
+The lantern and the sun, {A.name} and {B.name}: a light that seeks and a light that gives.
+The ninth degree twice, {A.name} and {B.name}: leaving the old, building the new.
+[kin.same.10-20]
+{A.name} and {B.name}, one degree: a cycle's end and the call of a new life; alone, one goes round in circles, the other flees the world.
+{A.name} stops, {B.name} wakes: the decisive turn is lived twice, outside and inside.
+The tenth degree twice, {A.name} and {B.name}: what ends waits for help, and the help comes from above.
+[tag.water]
+water, what flows and is received
+[tag.sun]
+the sun, warmth that builds
+[tag.moon]
+the moon, intuition and night
+[tag.animal]
+the animal, the force of instinct
+[tag.tower]
+the tower, what shuts in or shelters
+[tag.crown]
+the crown, power and spirit
+[tag.book]
+the book, knowledge in gestation
+[tag.sword]
+the sword, the clarity that cuts
+[tag.cup]
+the cup, the heart that receives
+[tag.coin]
+the coin, material life
+[tag.staff]
+the staff, energy in action
+[tag.child]
+the child, what is being born
+[tag.angel]
+the angel, help from above
+[tag.star]
+the star, hope and one's rightful place
+[tag.wheel]
+the wheel, the turning of cycles
+[tag.hand]
+the hand, what is grasped or let go
+[tag.path]
+the path, walking on
+[tag.flower]
+the flower, what opens out
+[tag.egg]
+the egg, a promise brooding
+[tag.mountain]
+the mountain, effort and height
+[card.0.name]
+The Fool
+[card.0.kw]
+Free energy
+[card.0.num]
+0
+[card.0.role]
+free energy on the move, with no fixed goal
+[card.0.from]
+from a surge that has no shape yet
+[card.0.to]
+towards a departure, a release
+[card.0.closing]
+Your strength is here, whole; it is up to you to give it a direction.
+[card.0.question]
+Where is your strength going right now? What sets you walking?
+[card.0.gaze]
+right
+[card.0.degree]
+0
+[card.0.row]
+0
+[card.0.symbols]
+animal,staff,path
+[card.0.reading]
+The Fool has no number: he is free energy, the force that runs through the whole Tarot. He walks with his bundle on his shoulder and an animal at his legs pushing him on. Today the question isn't whether you have strength but where you put it. Give it a direction.
+[card.0.printed]
+LE FOL
+[card.0.srole]
+free energy, setting out
+[card.0.brief]
+The Fool — free energy, unnumbered: he walks, bundle on his shoulder, pushed on by an animal. Where is your strength going?
+[card.1.name]
+The Magician
+[card.1.kw]
+Potential
+[card.1.num]
+I
+[card.1.role]
+a beginning, every tool on the table
+[card.1.from]
+from a first step, still unsure
+[card.1.to]
+towards a chosen beginning
+[card.1.closing]
+To choose is to begin to exist.
+[card.1.question]
+Of all your possibilities, which one do you want to make real?
+[card.1.gaze]
+left
+[card.1.degree]
+1
+[card.1.row]
+1
+[card.1.symbols]
+staff,cup,coin,hand
+[card.1.reading]
+First degree: everything in potential. On the Magician's table the tools lie ready, unused; his wand waits for a choice. You hold more possibilities than you could ever use. Today's work is to pick one and, for now, let the others go.
+[card.1.printed]
+LE BATELEVR
+[card.1.srole]
+the start, every tool
+[card.1.brief]
+I The Magician — first degree, all in potential: his tools wait on the table. Of all you could do, what do you choose?
+[card.2.name]
+The Popess
+[card.2.kw]
+Gestation
+[card.2.num]
+II
+[card.2.role]
+silent gestation, knowledge brooding
+[card.2.from]
+from a long preparation in silence
+[card.2.to]
+towards study, a fertile waiting
+[card.2.closing]
+What is brooding in you has its own time to be born.
+[card.2.question]
+What are you quietly brooding over? What isn't ready to be born yet?
+[card.2.gaze]
+left
+[card.2.degree]
+2
+[card.2.row]
+1
+[card.2.symbols]
+book,egg,crown
+[card.2.reading]
+Second degree: accumulation. The Popess sits cloistered, her book open, brooding over what is not yet born. Nothing shows yet, and that is right. Today, study, gather, keep quiet about what is forming. The risk is staying too long: every gestation calls for a birth.
+[card.2.printed]
+LA PANCES
+[card.2.srole]
+gestation, knowledge
+[card.2.brief]
+II The Popess — second degree, accumulation: cloistered, book open, she broods. What are you preparing in silence?
+[card.3.name]
+The Empress
+[card.3.kw]
+Creation
+[card.3.num]
+III
+[card.3.role]
+creative explosion, the surge of spring
+[card.3.from]
+from an outburst with no clear aim
+[card.3.to]
+towards a creation in bloom
+[card.3.closing]
+Let it flower; the form has time.
+[card.3.question]
+What is growing in you with force? Where does that surge want to go?
+[card.3.gaze]
+front
+[card.3.degree]
+3
+[card.3.row]
+1
+[card.3.symbols]
+crown,staff,animal
+[card.3.reading]
+Third degree: explosion. After the long preparation, energy bursts out like spring. The Empress, facing you, holds her sceptre and shield: she creates without aiming yet. Let out what is growing in you, even without a clear goal. The goal can wait; today it is the surge that counts.
+[card.3.printed]
+IMPERATRIS
+[card.3.srole]
+creative explosion
+[card.3.brief]
+III The Empress — third degree, explosion: facing us, sceptre and shield, she creates without aiming. What wants to burst out?
+[card.4.name]
+The Emperor
+[card.4.kw]
+Stability
+[card.4.num]
+IIII
+[card.4.role]
+stability, law, the father's power
+[card.4.from]
+from solid ground, settled order
+[card.4.to]
+towards a structure that holds
+[card.4.closing]
+Build on what holds, and don't wall yourself in.
+[card.4.question]
+On what solid ground can you build? What did you receive from your father?
+[card.4.gaze]
+left
+[card.4.degree]
+4
+[card.4.row]
+1
+[card.4.symbols]
+crown,staff,animal
+[card.4.reading]
+Fourth degree: stabilization. The Emperor, in profile on his throne, holds the material world in hand. He is the father, the law, security. Ask what you can build on, what in you stands firm. Set down a rule, a foundation. But stay watchful: what no longer moves goes stale.
+[card.4.printed]
+LEMPEREVR
+[card.4.srole]
+stability, the law
+[card.4.brief]
+IIII The Emperor — fourth degree, stabilization: in profile on his throne, he holds matter. What can you build on?
+[card.5.name]
+The Pope
+[card.5.kw]
+Transmission
+[card.5.num]
+V
+[card.5.role]
+the bridge, an ideal being passed on
+[card.5.from]
+from a teaching received
+[card.5.to]
+towards a word that connects
+[card.5.closing]
+What you have understood lives only when you pass it on.
+[card.5.question]
+What do you raise your eyes towards? Who teaches you, and whom do you teach?
+[card.5.gaze]
+right
+[card.5.degree]
+5
+[card.5.row]
+1
+[card.5.symbols]
+crown,staff,hand
+[card.5.reading]
+Fifth degree: an ideal appears. The Pope is a bridge between heaven and earth, between himself and the two disciples who listen. Today something wants to pass through you: a word, a knowledge, a union. Pass it on, or let yourself be taught. A bridge is worth only what it joins.
+[card.5.printed]
+LEPAPE
+[card.5.srole]
+the bridge, handing on
+[card.5.brief]
+V The Pope — fifth degree, the ideal: a bridge between the sky and two disciples. What asks to pass through you?
+[card.6.name]
+The Lover
+[card.6.kw]
+Union
+[card.6.num]
+VI
+[card.6.role]
+union, the joy of doing what you love
+[card.6.from]
+from a choice of the heart
+[card.6.to]
+towards a union, a chosen bond
+[card.6.closing]
+Where your joy is, your road begins.
+[card.6.question]
+What gives you joy? Which bond pulls you two ways?
+[card.6.gaze]
+left
+[card.6.degree]
+6
+[card.6.row]
+1
+[card.6.symbols]
+angel,sun,hand
+[card.6.reading]
+Sixth degree: pleasure, beauty, union. Three figures on the same ground, and above them a white sun where Love draws his bow. What do you truly love to do? With whom? Today, choose by your pleasure, not by fear. The right bond is known by its joy.
+[card.6.printed]
+LA MOVREV
+[card.6.srole]
+union, shared pleasure
+[card.6.brief]
+VI The Lover — sixth degree, union: three figures under a white sun where Love takes aim. What do you truly love doing?
+[card.7.name]
+The Chariot
+[card.7.kw]
+Action
+[card.7.num]
+VII
+[card.7.role]
+action in the world, the journey
+[card.7.from]
+from a conquest pursued head-on
+[card.7.to]
+towards action and departure
+[card.7.closing]
+Move forward, and stay at the centre of your chariot.
+[card.7.question]
+What carries you forward? What conquest is waiting for you?
+[card.7.gaze]
+front
+[card.7.degree]
+7
+[card.7.row]
+1
+[card.7.symbols]
+crown,animal,staff
+[card.7.reading]
+Seventh degree: action in the world. The Prince stands crowned in his chariot, each horse pulling its own way. He moves forward without leaving his centre. Today, go outward, act, take your place. What matters isn't speed but the unity of your mind and your body.
+[card.7.printed]
+LE CHARIOR
+[card.7.srole]
+action in the world
+[card.7.brief]
+VII The Chariot — seventh degree, action in the world: the prince moves on without leaving the centre. Where do you take your place?
+[card.8.name]
+Justice
+[card.8.kw]
+Balance
+[card.8.num]
+VIII
+[card.8.role]
+receptive perfection, true balance
+[card.8.from]
+from a judgement passed on you
+[card.8.to]
+towards balance, what is needed
+[card.8.closing]
+Keep what does you good; cut away the rest.
+[card.8.question]
+What leans too far to one side? Are you fair to yourself?
+[card.8.gaze]
+front
+[card.8.degree]
+8
+[card.8.row]
+1
+[card.8.symbols]
+sword,crown
+[card.8.reading]
+Eighth degree: receptive perfection. Justice faces you, sword in one hand, scales in the other. Nothing too much in her, nothing missing. Today, weigh your own life: keep what feeds you, cut what clutters you. Be fair to yourself, not harsh.
+[card.8.printed]
+IVSTICE
+[card.8.srole]
+true balance
+[card.8.brief]
+VIII Justice — eighth degree, receptive perfection: sword and scales, she faces you. What do you keep, what do you cut?
+[card.9.name]
+The Hermit
+[card.9.kw]
+Wisdom
+[card.9.num]
+VIIII
+[card.9.role]
+the opportune crisis, solitary wisdom
+[card.9.from]
+from a world that is ending
+[card.9.to]
+towards the unknown, inner light
+[card.9.closing]
+Between two worlds, your lantern is enough.
+[card.9.question]
+What is ending beneath your steps? What light do you keep in the dark?
+[card.9.gaze]
+left
+[card.9.degree]
+9
+[card.9.row]
+1
+[card.9.symbols]
+staff,path
+[card.9.reading]
+Ninth degree: the opportune crisis. The Hermit walks backward into what he does not know, his lantern raised. One world is ending, the next isn't born. Today, don't hurry out of it: this solitude is fertile. Light the coming step and let the unknown come to you.
+[card.9.printed]
+LERMITE
+[card.9.srole]
+crisis, solitary wisdom
+[card.9.brief]
+VIIII The Hermit — ninth degree, the opportune crisis: he backs into the unknown, lantern raised. Which step can you light?
+[card.10.name]
+The Wheel of Fortune
+[card.10.kw]
+End of cycle
+[card.10.num]
+X
+[card.10.role]
+a cycle at its end, the wheel at rest
+[card.10.from]
+from a completed cycle
+[card.10.to]
+towards a new cycle, with help
+[card.10.closing]
+When everything stops, reach out your hand.
+[card.10.question]
+What is going round in circles? Whose hand could help you start again?
+[card.10.gaze]
+front
+[card.10.degree]
+10
+[card.10.row]
+1
+[card.10.symbols]
+wheel,animal,crown
+[card.10.reading]
+Tenth degree: a cycle comes to its end. The Wheel stands still with its three animals, and it has a crank no one is turning. Everything has been lived; the energy has run out. Today, accept the stop, and ask for help: a hand from outside can start the wheel on a new cycle.
+[card.10.printed]
+LA ROVE DE FORTVN
+[card.10.srole]
+a cycle's end
+[card.10.brief]
+X The Wheel of Fortune — tenth degree, a cycle's end: no one turns the crank. Whose hand could help you start again?
+[card.11.name]
+Strength
+[card.11.kw]
+Instinct
+[card.11.num]
+XI
+[card.11.role]
+animal energy waking up
+[card.11.from]
+from an instinct kept on a leash
+[card.11.to]
+towards a creative force
+[card.11.closing]
+Your strength isn't against you: it is you.
+[card.11.question]
+What animal lives in you? Do you listen to it, or silence it?
+[card.11.gaze]
+right
+[card.11.degree]
+1
+[card.11.row]
+2
+[card.11.symbols]
+animal,hand
+[card.11.reading]
+Degree 1 again, in depth: a beginning that comes from the belly. The woman in the wide hat holds the lion's jaws, and you can't tell whether she tames it or it speaks to her. Today, listen to your instinct, your senses, your creativity. Don't silence them: make an alliance with them.
+[card.11.printed]
+FORCE
+[card.11.srole]
+instinct waking up
+[card.11.brief]
+XI Strength — degree 1 in depth, a beginning from the belly: she holds the lion's jaws. Do you listen to your instinct?
+[card.12.name]
+The Hanged Man
+[card.12.kw]
+Suspension
+[card.12.num]
+XII
+[card.12.role]
+suspension, self-offering, a fertile pause
+[card.12.from]
+from a long stillness
+[card.12.to]
+towards a pause, a new angle
+[card.12.closing]
+Doing nothing is work too.
+[card.12.question]
+What if you did nothing? What ripens while you wait?
+[card.12.gaze]
+front
+[card.12.degree]
+2
+[card.12.row]
+2
+[card.12.symbols]
+hand,child
+[card.12.reading]
+Degree 2 in depth: accumulation turned inward. The Hanged Man keeps his hands out of reach behind him: he grasps nothing now; he waits. Today is not the moment to decide. Let it ripen, look from upside down, listen. Stillness works too.
+[card.12.printed]
+LE PANDV
+[card.12.srole]
+self-offering, a pause
+[card.12.brief]
+XII The Hanged Man — degree 2 in depth: hands behind his back, he grasps nothing, he waits. What is ripening in you?
+[card.13.name]
+The Nameless Arcanum
+[card.13.kw]
+Transformation
+[card.13.num]
+XIII
+[card.13.role]
+radical mutation, what mows down and renews
+[card.13.from]
+from a break, a grief crossed
+[card.13.to]
+towards a mutation, a clearing
+[card.13.closing]
+What leaves makes room for the living.
+[card.13.question]
+What has had its day that you still carry? What needs cutting down?
+[card.13.gaze]
+right
+[card.13.degree]
+3
+[card.13.row]
+2
+[card.13.symbols]
+hand,crown
+[card.13.reading]
+Degree 3 in depth: explosion becomes mutation. The nameless Arcanum mows without hesitating; heads and hands are already rising from the earth. A worn-out form, a held-in anger ask to leave so that you can live more freely. What grows back afterwards is yours.
+[card.13.printed]
+[card.13.srole]
+radical mutation
+[card.13.brief]
+XIII The Nameless Arcanum — degree 3 in depth, mutation: he mows, and heads grow back. What has had its day?
+[card.14.name]
+Temperance
+[card.14.kw]
+Healing
+[card.14.num]
+XIIII
+[card.14.role]
+inner circulation, healing
+[card.14.from]
+from making peace with yourself
+[card.14.to]
+towards healing, the middle way
+[card.14.closing]
+Let it flow between your two vases.
+[card.14.question]
+Between which parts of you has the flow been cut off?
+[card.14.gaze]
+left
+[card.14.degree]
+4
+[card.14.row]
+2
+[card.14.symbols]
+angel,water,cup
+[card.14.reading]
+Degree 4 in depth: stability turned into circulation. The winged angel pours from one vase into the other without losing a drop. This is healing, protection, the middle way. Today, let what was frozen in you flow again, between body and mind. Make peace with yourself.
+[card.14.printed]
+TEMPERANCE
+[card.14.srole]
+healing, right measure
+[card.14.brief]
+XIIII Temperance — degree 4 in depth, circulation: the angel pours from vase to vase. What could flow in you again?
+[card.15.name]
+The Devil
+[card.15.kw]
+Temptation
+[card.15.num]
+XV
+[card.15.role]
+the depths, passion, temptation
+[card.15.from]
+from an attachment, a passion
+[card.15.to]
+towards the creative depths
+[card.15.closing]
+What binds you can feed you too, if you look at it.
+[card.15.question]
+What holds you? What treasure hides in what frightens you?
+[card.15.gaze]
+front
+[card.15.degree]
+5
+[card.15.row]
+2
+[card.15.symbols]
+sword,animal,hand
+[card.15.reading]
+Degree 5 in depth: the ideal goes down into the depths. The Devil holds two small creatures tied to his pedestal, but their ropes are loose. Look at what binds you: a desire, a fear, a passion. There is immense creative energy in it. Don't disown it; use it with your eyes open.
+[card.15.printed]
+LE DIABLE
+[card.15.srole]
+deep passion
+[card.15.brief]
+XV The Devil — degree 5 in depth, the ideal in the depths: two figures bound, ropes loose. What binds you?
+[card.16.name]
+The Tower
+[card.16.kw]
+Liberation
+[card.16.num]
+XVI
+[card.16.role]
+the joyful bursting, what finally comes out
+[card.16.from]
+from a frame grown too narrow
+[card.16.to]
+towards liberation, a departure
+[card.16.closing]
+When the walls fall, there is room to dance outside.
+[card.16.question]
+Which wall has grown too narrow? What wants to come out?
+[card.16.gaze]
+front
+[card.16.degree]
+6
+[card.16.row]
+2
+[card.16.symbols]
+tower,crown,hand
+[card.16.reading]
+Degree 6 in depth: joy that bursts the walls. The roof of the tower lifts like a lid, two figures tumble to the ground, coloured balls rain down. What was shut in comes out. Today, let the too-narrow frame fall. It isn't a loss: it's a way out.
+[card.16.printed]
+LA MAISON DIEV
+[card.16.srole]
+joyful bursting out
+[card.16.brief]
+XVI The Tower — degree 6 in depth, joy that bursts: the roof lifts, two figures come out. What wants to burst out with joy?
+[card.17.name]
+The Star
+[card.17.kw]
+Generosity
+[card.17.num]
+XVII
+[card.17.role]
+giving, generous action from one's rightful place
+[card.17.from]
+from a place found at last
+[card.17.to]
+towards your place, your gift
+[card.17.closing]
+Pour without counting: earth and water give it back.
+[card.17.question]
+Where do you set your knee down? What do you pour out, and for whom?
+[card.17.gaze]
+left
+[card.17.degree]
+7
+[card.17.row]
+2
+[card.17.symbols]
+star,water,flower
+[card.17.reading]
+Degree 7 in depth: action becomes giving. The naked woman, one knee on the ground, pours her two jugs into the river and onto the earth beneath eight stars. She has found her place and gives without counting. Today, ask where yours is, and what you can pour into the world from there.
+[card.17.printed]
+LE TOILLE
+[card.17.srole]
+giving, your true place
+[card.17.brief]
+XVII The Star — degree 7 in depth, action turned gift: one knee down, she pours her vases. Where is your place?
+[card.18.name]
+The Moon
+[card.18.kw]
+Receptivity
+[card.18.num]
+XVIII
+[card.18.role]
+intuition, night, the mystery of the mother
+[card.18.from]
+from a night of worry or of dreams
+[card.18.to]
+towards intuition, the unspoken
+[card.18.closing]
+What you receive at night lights up the day.
+[card.18.question]
+What do you know without being able to say it? What rises up at night?
+[card.18.gaze]
+front
+[card.18.degree]
+8
+[card.18.row]
+2
+[card.18.symbols]
+moon,water,animal,tower
+[card.18.reading]
+Degree 8 in depth: receptivity becomes intuition. The Moon receives the light; below, two dogs howl and the crayfish climbs up from the bottom of the water. This is night, the mother, what can't be explained. Today, force nothing. Let what comes from below rise, without judging it.
+[card.18.printed]
+LA LVNE
+[card.18.srole]
+intuition, the night
+[card.18.brief]
+XVIII The Moon — degree 8 in depth, intuition: the moon receives, the crayfish rises from below. What does the unexplained tell you?
+[card.19.name]
+The Sun
+[card.19.kw]
+Construction
+[card.19.num]
+XVIIII
+[card.19.role]
+new construction, shared warmth
+[card.19.from]
+from kinship, a helping hand
+[card.19.to]
+towards building together
+[card.19.closing]
+What love builds can last.
+[card.19.question]
+Who are you building with? Where do you find your warmth?
+[card.19.gaze]
+front
+[card.19.degree]
+9
+[card.19.row]
+2
+[card.19.symbols]
+sun,child
+[card.19.reading]
+Degree 9 in depth: after the crisis, a new construction. Beneath the great sun two children stand before a low wall, one helping the other. This is warmth, kinship, love that builds. Today, build something with someone, out in the open. Let yourself be loved.
+[card.19.printed]
+LE SOLEIL
+[card.19.srole]
+building together
+[card.19.brief]
+XVIIII The Sun — degree 9 in depth, a new construction: two children help each other under the sun. Who are you building with?
+[card.20.name]
+Judgement
+[card.20.kw]
+Calling
+[card.20.num]
+XX
+[card.20.role]
+the call, a new consciousness being born
+[card.20.from]
+from a call long ignored
+[card.20.to]
+towards rebirth, a calling
+[card.20.closing]
+Answer: what calls you wants to be born through you.
+[card.20.question]
+What call can you no longer ignore? What is being born in you?
+[card.20.gaze]
+front
+[card.20.degree]
+10
+[card.20.row]
+2
+[card.20.symbols]
+angel,child
+[card.20.reading]
+Degree 10 in depth: the end of a cycle becomes a birth. The angel sounds his trumpet and a figure rises from the ground, between a man and a woman at prayer. It is the call of a new consciousness, a desire that won't be refused. Today, hear what is calling you, and answer without waiting.
+[card.20.printed]
+LE IVGEMENT
+[card.20.srole]
+the call, rebirth
+[card.20.brief]
+XX Judgement — degree 10 in depth, a birth: the angel sounds, a figure rises from the earth. What call do you hear?
+[card.21.name]
+The World
+[card.21.kw]
+Realization
+[card.21.num]
+XXI
+[card.21.role]
+total realization, the world fulfilled
+[card.21.from]
+from a fulfilment, a finished work
+[card.21.to]
+towards realization, a wider world
+[card.21.closing]
+Everything is here; and the world keeps opening.
+[card.21.question]
+What have you already achieved without seeing it? Onto what larger world does it open?
+[card.21.gaze]
+left
+[card.21.degree]
+21
+[card.21.row]
+3
+[card.21.symbols]
+angel,animal,staff
+[card.21.reading]
+XXI, total realization. In the centre of a wreath of leaves a figure dances, surrounded by an angel, an eagle and two beasts. Nothing is missing. Today, look at what you have achieved as a whole, with all four of your energies. Every realization opens onto a larger world.
+[card.21.printed]
+LEMONDE
+[card.21.srole]
+total realization
+[card.21.brief]
+XXI The World — total realization: a figure dances in a wreath, among four creatures. What have you accomplished?

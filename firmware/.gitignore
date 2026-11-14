@@ -1,0 +1,19 @@
+build/
+build-bench/
+build-stress/
+managed_components/
+# Generated from sdkconfig.defaults on the first build (verified identical); edit the defaults or
+# use `idf.py menuconfig` + `idf.py save-defconfig`, never commit the generated file.
+sdkconfig
+sdkconfig.old
+# Bring-up script outputs
+last_boot.log
+last_boot.log.tmp
+build.log
+build-bench.log
+build-stress.log
+sleep_soak.log
+e2e_screenshot.raw
+e2e_screenshot.png
+screenshot-*.png
+e2e_coredump.bin

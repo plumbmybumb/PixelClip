@@ -1,0 +1,13 @@
+# tilt-slow: rock the clip slowly left and right (+-65 degrees about the viewing axis).
+# t(s)  gx     gy     gz      gravity in g, display frame: +x right, +y down, +z out of the glass
+0.0     0.000  1.000  0.0
+0.6     0.000  1.000  0.0
+1.2     0.574  0.819  0.0
+1.8     0.906  0.423  0.0
+2.4     0.574  0.819  0.0
+2.8     0.000  1.000  0.0
+3.2    -0.574  0.819  0.0
+3.8    -0.906  0.423  0.0
+4.4    -0.574  0.819  0.0
+5.0     0.000  1.000  0.0
+6.0     0.000  1.000  0.0

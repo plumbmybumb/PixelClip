@@ -1,0 +1,93 @@
+menu "Hair Clip"
+
+    # Options of reusable components live with the component, so other projects that reuse them
+    # get them too: display (HAIRCLIP_LCD_*) in components/display/Kconfig, power
+    # (HAIRCLIP_CPU_*, HAIRCLIP_AUTO_LIGHT_SLEEP, HAIRCLIP_BATTERY_SAMPLE_S, HAIRCLIP_BAT_ADC_GPIO) in
+    # components/power/Kconfig, PIXELCLIP_RTC_WDT_TIMEOUT_S in components/health/Kconfig.
+
+    config HAIRCLIP_WIFI_CHANNEL
+        int "SoftAP channel"
+        range 1 13
+        default 6
+
+    config HAIRCLIP_WIFI_MAX_TX_DBM
+        int "SoftAP max TX power on USB (dBm)"
+        range 2 20
+        default 10
+        help
+            Caps radio TX power to limit peak current and heat (500 mAh / 0.5 A cell; the SoftAP
+            idles at roughly 100 mA, TX bursts reach ~300 mA at full power).
+
+    config HAIRCLIP_WIFI_MAX_TX_DBM_BATTERY
+        int "SoftAP max TX power on battery (dBm)"
+        range 2 20
+        default 8
+        help
+            TX cap used when the session starts (or USB is unplugged during it) without USB power.
+            Lower than the USB cap: TX bursts sag the 500 mAh cell (README "Light sleep on battery").
+            A phone within a metre or two does not need more.
+
+    config PIXELCLIP_BENCH_SLEEP_TEST
+        bool "Bench: light-sleep soak test (NOT for the clip)"
+        default n
+        help
+            Bench reproduction of the battery hang (README "Light sleep on battery"): automatic light sleep
+            also while USB is connected (requires CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION=n: build with
+            sdkconfig.bench, e.g. BENCH=1 scripts/flash.sh), an upload session every few minutes, a 4 px
+            heartbeat dot in the bottom-left corner and a status line every 30 s for scripts/sleep_soak.sh.
+
+    config PIXELCLIP_BENCH_FIRST_S
+        int "Bench: first session after boot (s)"
+        depends on PIXELCLIP_BENCH_SLEEP_TEST
+        default 20
+
+    config PIXELCLIP_BENCH_SESSION_S
+        int "Bench: session length (s)"
+        depends on PIXELCLIP_BENCH_SLEEP_TEST
+        default 40
+
+    config PIXELCLIP_BENCH_PERIOD_S
+        int "Bench: session period (s)"
+        depends on PIXELCLIP_BENCH_SLEEP_TEST
+        default 120
+
+    config PIXELCLIP_BENCH_WIFI_DEINIT
+        bool "Bench: old session end (esp_wifi_deinit with BLE on) to confirm the root cause"
+        depends on PIXELCLIP_BENCH_SLEEP_TEST
+        default n
+        help
+            Restores the pre-fix session end (WiFi driver deinitialised while NimBLE + coexistence run).
+            Soak once with and once without: a hang (RTCWDT reset) only with it confirms the cause.
+
+    config PIXELCLIP_BENCH_STRESS
+        bool "Bench: stress session (NOT for the clip)"
+        default n
+        help
+            Bench reproduction of the session hang (README "Bench: stress session, watchdog and crash tests"): on
+            USB, opens a screen-on upload session after CONFIG_PIXELCLIP_BENCH_STRESS_FIRST_S, plays the water scene
+            and stores a 200 KB glyph atlas (generated, embedded) through the same storage path as PUT /assets
+            every CONFIG_PIXELCLIP_BENCH_STRESS_PERIOD_S while the BLE fast lane stays up, logging the internal heap
+            after each store. Build with sdkconfig.stress (STRESS=1 scripts/flash.sh). Also enables the
+            /bench/crash and /bench/wedge routes.
+
+    config PIXELCLIP_BENCH_STRESS_FIRST_S
+        int "Bench stress: first session after boot (s)"
+        depends on PIXELCLIP_BENCH_STRESS
+        default 20
+
+    config PIXELCLIP_BENCH_STRESS_PERIOD_S
+        int "Bench stress: one self-upload every (s)"
+        depends on PIXELCLIP_BENCH_STRESS
+        default 30
+
+    config PIXELCLIP_BENCH_ROUTES
+        bool "Bench: POST /bench/crash and /bench/wedge (NOT for the clip)"
+        default y if PIXELCLIP_BENCH_SLEEP_TEST || PIXELCLIP_BENCH_STRESS
+        default n
+        help
+            Deliberate faults that prove the safety nets end to end (health.h): a panic with a core dump
+            ({"kind":"abort|assert|null|stack"}) and wedges that only the RTC watchdog can end
+            ({"mode":"sleep|suspend|irqoff|player|power|httpd|tcpip|ble|controller"}). Also over the BLE
+            fast lane (scripts/ble_api.py POST /bench/wedge '{"mode":"sleep"}').
+
+endmenu

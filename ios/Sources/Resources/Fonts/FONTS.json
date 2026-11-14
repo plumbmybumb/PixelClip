@@ -1,0 +1,1007 @@
+{
+  "generatedBy": "tools/fonts/fetch_fonts.py",
+  "source": "https://github.com/google/fonts (ofl/)",
+  "license": "SIL Open Font License 1.1 (OFL.txt in each family folder)",
+  "totalBytes": 5956486,
+  "families": [
+    {
+      "family": "Press Start 2P",
+      "folder": "PressStart2P",
+      "directory": "pressstart2p",
+      "mood": "pixel",
+      "designer": "CodeMan38",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "PressStart2P/OFL.txt",
+      "copyright": "Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name \"Press Start 2P\".",
+      "files": [
+        {
+          "file": "PressStart2P/PressStart2P-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/pressstart2p/PressStart2P-Regular.ttf",
+          "bytes": 118204,
+          "sha256": "034c77f1f05ec89421e4a63f0e3a4ca1ecf852cc6d2bf611f126f275728e017d",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "PressStart2P-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "PressStart2P/PressStart2P-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Silkscreen",
+      "folder": "Silkscreen",
+      "directory": "silkscreen",
+      "mood": "pixel",
+      "designer": "Jason Kottke",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "Silkscreen/OFL.txt",
+      "copyright": "Copyright 2001 The Silkscreen Project Authors (https://github.com/googlefonts/silkscreen)",
+      "files": [
+        {
+          "file": "Silkscreen/Silkscreen-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/silkscreen/Silkscreen-Regular.ttf",
+          "bytes": 32220,
+          "sha256": "c845473330b94c2079ce9af01c51ac8ba2d99c24f4d14c039843bbb8e642ebd8",
+          "variable": false
+        },
+        {
+          "file": "Silkscreen/Silkscreen-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/silkscreen/Silkscreen-Bold.ttf",
+          "bytes": 30632,
+          "sha256": "768476aa712d4f5c3e18d3bce80f980a8bd3f72b7094d22ec5e768df3acfed61",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "Silkscreen-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "Silkscreen/Silkscreen-Regular.ttf"
+        },
+        {
+          "postScriptName": "Silkscreen-Bold",
+          "style": "Bold",
+          "weight": 700,
+          "ctWeight": 0.4,
+          "italic": false,
+          "file": "Silkscreen/Silkscreen-Bold.ttf"
+        }
+      ]
+    },
+    {
+      "family": "VT323",
+      "folder": "VT323",
+      "directory": "vt323",
+      "mood": "pixel",
+      "designer": "Peter Hull",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "VT323/OFL.txt",
+      "copyright": "Copyright 2011, The VT323 Project Authors (peter.hull@oikoi.com)",
+      "files": [
+        {
+          "file": "VT323/VT323-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/vt323/VT323-Regular.ttf",
+          "bytes": 153116,
+          "sha256": "cf4de751ada78ceac033dbe16a687742939995b77bc2a052ae17a4957958594d",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "VT323-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "VT323/VT323-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "DotGothic16",
+      "folder": "DotGothic16",
+      "directory": "dotgothic16",
+      "mood": "pixel",
+      "designer": "Fontworks Inc.",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "DotGothic16/OFL.txt",
+      "copyright": "Copyright 2020 The DotGothic16 Project Authors (https://github.com/fontworks-fonts/DotGothic16)",
+      "files": [
+        {
+          "file": "DotGothic16/DotGothic16-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/dotgothic16/DotGothic16-Regular.ttf",
+          "bytes": 2069236,
+          "sha256": "3ad9af88726d42b40f7f365f0dcac785af73cf20ea6f1d5b44e57cc21150b8f1",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "DotGothic16-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "DotGothic16/DotGothic16-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Pixelify Sans",
+      "folder": "PixelifySans",
+      "directory": "pixelifysans",
+      "mood": "pixel",
+      "designer": "Stefie Justprince",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "PixelifySans/OFL.txt",
+      "copyright": "Copyright 2021 The Pixelify Sans Project Authors (https://github.com/eifetx/Pixelify-Sans)",
+      "files": [
+        {
+          "file": "PixelifySans/PixelifySans-VF.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/pixelifysans/PixelifySans[wght].ttf",
+          "bytes": 79160,
+          "sha256": "9ba86cd010a4de309d263ceff8e8044092c9db7efda869620cb9ff1c4389e8a5",
+          "variable": true
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "PixelifySans-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "PixelifySans/PixelifySans-VF.ttf"
+        },
+        {
+          "postScriptName": "PixelifySans-Regular_Medium",
+          "style": "Medium",
+          "weight": 500,
+          "ctWeight": 0.23,
+          "italic": false,
+          "file": "PixelifySans/PixelifySans-VF.ttf"
+        },
+        {
+          "postScriptName": "PixelifySans-Regular_SemiBold",
+          "style": "SemiBold",
+          "weight": 600,
+          "ctWeight": 0.3,
+          "italic": false,
+          "file": "PixelifySans/PixelifySans-VF.ttf"
+        },
+        {
+          "postScriptName": "PixelifySans-Regular_Bold",
+          "style": "Bold",
+          "weight": 700,
+          "ctWeight": 0.4,
+          "italic": false,
+          "file": "PixelifySans/PixelifySans-VF.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Tiny5",
+      "folder": "Tiny5",
+      "directory": "tiny5",
+      "mood": "pixel",
+      "designer": "Stefan Schmidt",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "Tiny5/OFL.txt",
+      "copyright": "Copyright 2022-2024 The Tiny5 Project Authors (https://github.com/Gissio/font_tiny5)",
+      "files": [
+        {
+          "file": "Tiny5/Tiny5-VF.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/tiny5/Tiny5[BLED,JITT,ROND,wdth,wght].ttf",
+          "bytes": 433432,
+          "sha256": "588626f2c1b164f55927c0d8123f4bc134651aad7d257da68fc19b0824b0d8fa",
+          "variable": true
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "Tiny5-Thin",
+          "style": "Thin",
+          "weight": 100,
+          "ctWeight": -0.8,
+          "italic": false,
+          "file": "Tiny5/Tiny5-VF.ttf"
+        },
+        {
+          "postScriptName": "Tiny5-ExtraLight",
+          "style": "ExtraLight",
+          "weight": 200,
+          "ctWeight": -0.6,
+          "italic": false,
+          "file": "Tiny5/Tiny5-VF.ttf"
+        },
+        {
+          "postScriptName": "Tiny5-Light",
+          "style": "Light",
+          "weight": 300,
+          "ctWeight": -0.4,
+          "italic": false,
+          "file": "Tiny5/Tiny5-VF.ttf"
+        },
+        {
+          "postScriptName": "Tiny5-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "Tiny5/Tiny5-VF.ttf"
+        },
+        {
+          "postScriptName": "Tiny5-Medium",
+          "style": "Medium",
+          "weight": 500,
+          "ctWeight": 0.23,
+          "italic": false,
+          "file": "Tiny5/Tiny5-VF.ttf"
+        },
+        {
+          "postScriptName": "Tiny5-SemiBold",
+          "style": "SemiBold",
+          "weight": 600,
+          "ctWeight": 0.3,
+          "italic": false,
+          "file": "Tiny5/Tiny5-VF.ttf"
+        },
+        {
+          "postScriptName": "Tiny5-Bold",
+          "style": "Bold",
+          "weight": 700,
+          "ctWeight": 0.4,
+          "italic": false,
+          "file": "Tiny5/Tiny5-VF.ttf"
+        },
+        {
+          "postScriptName": "Tiny5-ExtraBold",
+          "style": "ExtraBold",
+          "weight": 800,
+          "ctWeight": 0.56,
+          "italic": false,
+          "file": "Tiny5/Tiny5-VF.ttf"
+        },
+        {
+          "postScriptName": "Tiny5-Black",
+          "style": "Black",
+          "weight": 900,
+          "ctWeight": 0.62,
+          "italic": false,
+          "file": "Tiny5/Tiny5-VF.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Bungee",
+      "folder": "Bungee",
+      "directory": "bungee",
+      "mood": "display",
+      "designer": "David Jonathan Ross",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "Bungee/OFL.txt",
+      "copyright": "Copyright 2023 The Bungee Project Authors (https://github.com/djrrb/Bungee)",
+      "files": [
+        {
+          "file": "Bungee/Bungee-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/bungee/Bungee-Regular.ttf",
+          "bytes": 118996,
+          "sha256": "c4f5361ce120af3e6b9156d0bf379fa19cda2ea0cd18ac01fd99596c6bf66e3f",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "Bungee-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "Bungee/Bungee-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Monoton",
+      "folder": "Monoton",
+      "directory": "monoton",
+      "mood": "display",
+      "designer": "Vernon Adams",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "Monoton/OFL.txt",
+      "copyright": "Copyright (c) 2011 by vernon adams (vern@newtypography.co.uk),",
+      "files": [
+        {
+          "file": "Monoton/Monoton-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/monoton/Monoton-Regular.ttf",
+          "bytes": 51604,
+          "sha256": "951c4cea65ffede784a7c9672feec5d329a7e1e12216c42d53ecf36c90d04dea",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "Monoton-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "Monoton/Monoton-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Bebas Neue",
+      "folder": "BebasNeue",
+      "directory": "bebasneue",
+      "mood": "display",
+      "designer": "Ryoichi Tsunekawa",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "BebasNeue/OFL.txt",
+      "copyright": "Copyright © 2010 by Dharma Type.",
+      "files": [
+        {
+          "file": "BebasNeue/BebasNeue-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/bebasneue/BebasNeue-Regular.ttf",
+          "bytes": 61400,
+          "sha256": "08e4623805102d819f58601e46e345648846075e363b2ceb23313c2d1c83ec73",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "BebasNeue-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "BebasNeue/BebasNeue-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Rubik Mono One",
+      "folder": "RubikMonoOne",
+      "directory": "rubikmonoone",
+      "mood": "display",
+      "designer": "Hubert and Fischer",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "RubikMonoOne/OFL.txt",
+      "copyright": "Copyright 2015 The Rubik Project Authors (mail@hubertfischer.com)",
+      "files": [
+        {
+          "file": "RubikMonoOne/RubikMonoOne-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/rubikmonoone/RubikMonoOne-Regular.ttf",
+          "bytes": 141088,
+          "sha256": "b22624b6a36e543e942106edfccd198c50b57b65b924bfe02a6f0a5699429e6b",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "RubikMonoOne-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "RubikMonoOne/RubikMonoOne-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Righteous",
+      "folder": "Righteous",
+      "directory": "righteous",
+      "mood": "display",
+      "designer": "Astigmatic",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "Righteous/OFL.txt",
+      "copyright": "Copyright (c) 2011 by Brian J. Bonislawsky DBA Astigmatic (AOETI)",
+      "files": [
+        {
+          "file": "Righteous/Righteous-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/righteous/Righteous-Regular.ttf",
+          "bytes": 43104,
+          "sha256": "2ffb3fe5c27d7e6571210b800448c4e234e651b46c6b4426c1bb567e5341348a",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "Righteous-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "Righteous/Righteous-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Orbitron",
+      "folder": "Orbitron",
+      "directory": "orbitron",
+      "mood": "display",
+      "designer": "Matt McInerney",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "Orbitron/OFL.txt",
+      "copyright": "Copyright 2018 The Orbitron Project Authors (https://github.com/theleagueof/orbitron), with Reserved Font Name: \"Orbitron\"",
+      "files": [
+        {
+          "file": "Orbitron/Orbitron-VF.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/orbitron/Orbitron[wght].ttf",
+          "bytes": 38576,
+          "sha256": "f42db2dd16e642258e35782916eceb1dcdbea06fb958d77ad71dc5963587e8fd",
+          "variable": true
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "Orbitron-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "Orbitron/Orbitron-VF.ttf"
+        },
+        {
+          "postScriptName": "Orbitron-Medium",
+          "style": "Medium",
+          "weight": 500,
+          "ctWeight": 0.23,
+          "italic": false,
+          "file": "Orbitron/Orbitron-VF.ttf"
+        },
+        {
+          "postScriptName": "Orbitron-SemiBold",
+          "style": "SemiBold",
+          "weight": 600,
+          "ctWeight": 0.3,
+          "italic": false,
+          "file": "Orbitron/Orbitron-VF.ttf"
+        },
+        {
+          "postScriptName": "Orbitron-Bold",
+          "style": "Bold",
+          "weight": 700,
+          "ctWeight": 0.4,
+          "italic": false,
+          "file": "Orbitron/Orbitron-VF.ttf"
+        },
+        {
+          "postScriptName": "Orbitron-ExtraBold",
+          "style": "ExtraBold",
+          "weight": 800,
+          "ctWeight": 0.56,
+          "italic": false,
+          "file": "Orbitron/Orbitron-VF.ttf"
+        },
+        {
+          "postScriptName": "Orbitron-Black",
+          "style": "Black",
+          "weight": 900,
+          "ctWeight": 0.62,
+          "italic": false,
+          "file": "Orbitron/Orbitron-VF.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Audiowide",
+      "folder": "Audiowide",
+      "directory": "audiowide",
+      "mood": "display",
+      "designer": "Astigmatic",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "Audiowide/OFL.txt",
+      "copyright": "Copyright (c) 2012, Brian J. Bonislawsky DBA Astigmatic (AOETI) (astigma@astigmatic.com), with Reserved Font Names \"Audiowide\"",
+      "files": [
+        {
+          "file": "Audiowide/Audiowide-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/audiowide/Audiowide-Regular.ttf",
+          "bytes": 69916,
+          "sha256": "c7c0f2b0f6fad8c623e31772ce79f94a4edb9321ffce9fce978ea892d20ae730",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "Audiowide-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "Audiowide/Audiowide-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Unica One",
+      "folder": "UnicaOne",
+      "directory": "unicaone",
+      "mood": "display",
+      "designer": "Eduardo Tunni",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "UnicaOne/OFL.txt",
+      "copyright": "Copyright 2012 The Unica One Project Authors (https://github.com/etunni/unica)",
+      "files": [
+        {
+          "file": "UnicaOne/UnicaOne-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/unicaone/UnicaOne-Regular.ttf",
+          "bytes": 71872,
+          "sha256": "5d5861ae199cb69049e77e7cd08a8ffd6c14e90da19c8db8df0f4004ca93bd8f",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "UnicaOne-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "UnicaOne/UnicaOne-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Abril Fatface",
+      "folder": "AbrilFatface",
+      "directory": "abrilfatface",
+      "mood": "display",
+      "designer": "TypeTogether",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "AbrilFatface/OFL.txt",
+      "copyright": "Copyright (c) 2011, TypeTogether (www.type-together.com),",
+      "files": [
+        {
+          "file": "AbrilFatface/AbrilFatface-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/abrilfatface/AbrilFatface-Regular.ttf",
+          "bytes": 67364,
+          "sha256": "5971d4a3758a922a9fedc7f6fb825a96341a2e718c45a4b2c9a6b417c8c4dbe9",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "AbrilFatface-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "AbrilFatface/AbrilFatface-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Major Mono Display",
+      "folder": "MajorMonoDisplay",
+      "directory": "majormonodisplay",
+      "mood": "display",
+      "designer": "Emre Parlak",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "MajorMonoDisplay/OFL.txt",
+      "copyright": "Copyright 2018 The Major Mono Project Authors (https://github.com/googlefonts/majormono)",
+      "files": [
+        {
+          "file": "MajorMonoDisplay/MajorMonoDisplay-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/majormonodisplay/MajorMonoDisplay-Regular.ttf",
+          "bytes": 126788,
+          "sha256": "3f2ee71c2b8464f065bf960a148be81d68fcc13385df87737928f948208dffc6",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "MajorMonoDisplay-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "MajorMonoDisplay/MajorMonoDisplay-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Pacifico",
+      "folder": "Pacifico",
+      "directory": "pacifico",
+      "mood": "script",
+      "designer": "Vernon Adams, Jacques Le Bailly, Botjo Nikoltchev, Ani Petrova",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "Pacifico/OFL.txt",
+      "copyright": "Copyright 2018 The Pacifico Project Authors (https://github.com/googlefonts/Pacifico)",
+      "files": [
+        {
+          "file": "Pacifico/Pacifico-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/pacifico/Pacifico-Regular.ttf",
+          "bytes": 329380,
+          "sha256": "5b6c0d5334a7bf77dea52b975c5a0c408878c0f7115ed5b6fb151f634b7bf701",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "Pacifico-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "Pacifico/Pacifico-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Lobster",
+      "folder": "Lobster",
+      "directory": "lobster",
+      "mood": "script",
+      "designer": "Impallari Type",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "Lobster/OFL.txt",
+      "copyright": "Copyright 2010 The Lobster Project Authors (https://github.com/impallari/The-Lobster-Font), with Reserved Font Name \"Lobster\".",
+      "files": [
+        {
+          "file": "Lobster/Lobster-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/lobster/Lobster-Regular.ttf",
+          "bytes": 406076,
+          "sha256": "d6568e697fd50cedc0be04d8aae4127fe95add607e7bff954ca88604be80c205",
+          "variable": false
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "Lobster-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "Lobster/Lobster-Regular.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Dancing Script",
+      "folder": "DancingScript",
+      "directory": "dancingscript",
+      "mood": "script",
+      "designer": "Impallari Type",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "DancingScript/OFL.txt",
+      "copyright": "Copyright 2016 The Dancing Script Project Authors (https://github.com/googlefonts/DancingScript), with Reserved Font Name 'Dancing Script'.",
+      "files": [
+        {
+          "file": "DancingScript/DancingScript-VF.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/dancingscript/DancingScript[wght].ttf",
+          "bytes": 133636,
+          "sha256": "21808625578fe8d8cd10cb684be546dca077b27cd03a53a2f1ec11dc743c924c",
+          "variable": true
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "DancingScript-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "DancingScript/DancingScript-VF.ttf"
+        },
+        {
+          "postScriptName": "DancingScript-Medium",
+          "style": "Medium",
+          "weight": 500,
+          "ctWeight": 0.23,
+          "italic": false,
+          "file": "DancingScript/DancingScript-VF.ttf"
+        },
+        {
+          "postScriptName": "DancingScript-SemiBold",
+          "style": "SemiBold",
+          "weight": 600,
+          "ctWeight": 0.3,
+          "italic": false,
+          "file": "DancingScript/DancingScript-VF.ttf"
+        },
+        {
+          "postScriptName": "DancingScript-Bold",
+          "style": "Bold",
+          "weight": 700,
+          "ctWeight": 0.4,
+          "italic": false,
+          "file": "DancingScript/DancingScript-VF.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Caveat",
+      "folder": "Caveat",
+      "directory": "caveat",
+      "mood": "script",
+      "designer": "Impallari Type",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "Caveat/OFL.txt",
+      "copyright": "Copyright 2014 The Caveat Project Authors (https://github.com/googlefonts/caveat)",
+      "files": [
+        {
+          "file": "Caveat/Caveat-VF.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/caveat/Caveat[wght].ttf",
+          "bytes": 403648,
+          "sha256": "0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988",
+          "variable": true
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "Caveat-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "Caveat/Caveat-VF.ttf"
+        },
+        {
+          "postScriptName": "CaveatRoman-Bold",
+          "style": "Bold",
+          "weight": 700,
+          "ctWeight": 0.4,
+          "italic": false,
+          "file": "Caveat/Caveat-VF.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Playfair Display",
+      "folder": "PlayfairDisplay",
+      "directory": "playfairdisplay",
+      "mood": "editorial",
+      "designer": "Claus Eggers Sørensen",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "PlayfairDisplay/OFL.txt",
+      "copyright": "Copyright 2017 The Playfair Display Project Authors (https://github.com/clauseggers/Playfair-Display), with Reserved Font Name \"Playfair Display\"",
+      "files": [
+        {
+          "file": "PlayfairDisplay/PlayfairDisplay-VF.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/PlayfairDisplay[wght].ttf",
+          "bytes": 300724,
+          "sha256": "c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6",
+          "variable": true
+        },
+        {
+          "file": "PlayfairDisplay/PlayfairDisplay-Italic-VF.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/PlayfairDisplay-Italic[wght].ttf",
+          "bytes": 278688,
+          "sha256": "a5e26dc5e2e77fb2803a0bf02fd4f81ee136ec8dea863ccdb0c59a263b21378b",
+          "variable": true
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "PlayfairDisplay-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "PlayfairDisplay/PlayfairDisplay-VF.ttf"
+        },
+        {
+          "postScriptName": "PlayfairDisplay-Italic",
+          "style": "Italic",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": true,
+          "file": "PlayfairDisplay/PlayfairDisplay-Italic-VF.ttf"
+        },
+        {
+          "postScriptName": "PlayfairDisplayRoman-Medium",
+          "style": "Medium",
+          "weight": 500,
+          "ctWeight": 0.23,
+          "italic": false,
+          "file": "PlayfairDisplay/PlayfairDisplay-VF.ttf"
+        },
+        {
+          "postScriptName": "PlayfairDisplayItalic-Medium",
+          "style": "Medium Italic",
+          "weight": 500,
+          "ctWeight": 0.23,
+          "italic": true,
+          "file": "PlayfairDisplay/PlayfairDisplay-Italic-VF.ttf"
+        },
+        {
+          "postScriptName": "PlayfairDisplayRoman-SemiBold",
+          "style": "SemiBold",
+          "weight": 600,
+          "ctWeight": 0.3,
+          "italic": false,
+          "file": "PlayfairDisplay/PlayfairDisplay-VF.ttf"
+        },
+        {
+          "postScriptName": "PlayfairDisplayItalic-SemiBold",
+          "style": "SemiBold Italic",
+          "weight": 600,
+          "ctWeight": 0.3,
+          "italic": true,
+          "file": "PlayfairDisplay/PlayfairDisplay-Italic-VF.ttf"
+        },
+        {
+          "postScriptName": "PlayfairDisplayRoman-Bold",
+          "style": "Bold",
+          "weight": 700,
+          "ctWeight": 0.4,
+          "italic": false,
+          "file": "PlayfairDisplay/PlayfairDisplay-VF.ttf"
+        },
+        {
+          "postScriptName": "PlayfairDisplayItalic-Bold",
+          "style": "Bold Italic",
+          "weight": 700,
+          "ctWeight": 0.4,
+          "italic": true,
+          "file": "PlayfairDisplay/PlayfairDisplay-Italic-VF.ttf"
+        },
+        {
+          "postScriptName": "PlayfairDisplayRoman-ExtraBold",
+          "style": "ExtraBold",
+          "weight": 800,
+          "ctWeight": 0.56,
+          "italic": false,
+          "file": "PlayfairDisplay/PlayfairDisplay-VF.ttf"
+        },
+        {
+          "postScriptName": "PlayfairDisplayItalic-ExtraBold",
+          "style": "ExtraBold Italic",
+          "weight": 800,
+          "ctWeight": 0.56,
+          "italic": true,
+          "file": "PlayfairDisplay/PlayfairDisplay-Italic-VF.ttf"
+        },
+        {
+          "postScriptName": "PlayfairDisplayRoman-Black",
+          "style": "Black",
+          "weight": 900,
+          "ctWeight": 0.62,
+          "italic": false,
+          "file": "PlayfairDisplay/PlayfairDisplay-VF.ttf"
+        },
+        {
+          "postScriptName": "PlayfairDisplayItalic-Black",
+          "style": "Black Italic",
+          "weight": 900,
+          "ctWeight": 0.62,
+          "italic": true,
+          "file": "PlayfairDisplay/PlayfairDisplay-Italic-VF.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Space Grotesk",
+      "folder": "SpaceGrotesk",
+      "directory": "spacegrotesk",
+      "mood": "editorial",
+      "designer": "Florian Karsten",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "SpaceGrotesk/OFL.txt",
+      "copyright": "Copyright 2020 The Space Grotesk Project Authors (https://github.com/floriankarsten/space-grotesk)",
+      "files": [
+        {
+          "file": "SpaceGrotesk/SpaceGrotesk-VF.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/spacegrotesk/SpaceGrotesk[wght].ttf",
+          "bytes": 136676,
+          "sha256": "acad6de1fc93436f5c0f1f4137751ef04f1aea3063e7036535970ffcfbd79f72",
+          "variable": true
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "SpaceGrotesk-Light",
+          "style": "Light",
+          "weight": 300,
+          "ctWeight": -0.4,
+          "italic": false,
+          "file": "SpaceGrotesk/SpaceGrotesk-VF.ttf"
+        },
+        {
+          "postScriptName": "SpaceGrotesk-Light_Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "SpaceGrotesk/SpaceGrotesk-VF.ttf"
+        },
+        {
+          "postScriptName": "SpaceGrotesk-Light_Medium",
+          "style": "Medium",
+          "weight": 500,
+          "ctWeight": 0.23,
+          "italic": false,
+          "file": "SpaceGrotesk/SpaceGrotesk-VF.ttf"
+        },
+        {
+          "postScriptName": "SpaceGrotesk-Light_Bold",
+          "style": "Bold",
+          "weight": 700,
+          "ctWeight": 0.4,
+          "italic": false,
+          "file": "SpaceGrotesk/SpaceGrotesk-VF.ttf"
+        }
+      ]
+    },
+    {
+      "family": "Fredoka",
+      "folder": "Fredoka",
+      "directory": "fredoka",
+      "mood": "editorial",
+      "designer": "Milena Brandão, Hafontia",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "Fredoka/OFL.txt",
+      "copyright": "Copyright 2016 The Fredoka Project Authors (https://github.com/hafontia/Fredoka-One)",
+      "files": [
+        {
+          "file": "Fredoka/Fredoka-VF.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/fredoka/Fredoka[wdth,wght].ttf",
+          "bytes": 159184,
+          "sha256": "2ba02e68b152868aef9ba28e24b3648c7d457fe6f25c761f2c2c53fb61a73fc8",
+          "variable": true
+        }
+      ],
+      "faces": [
+        {
+          "postScriptName": "Fredoka-Light",
+          "style": "Light",
+          "weight": 300,
+          "ctWeight": -0.4,
+          "italic": false,
+          "file": "Fredoka/Fredoka-VF.ttf"
+        },
+        {
+          "postScriptName": "Fredoka-Regular",
+          "style": "Regular",
+          "weight": 400,
+          "ctWeight": 0.0,
+          "italic": false,
+          "file": "Fredoka/Fredoka-VF.ttf"
+        },
+        {
+          "postScriptName": "Fredoka-Medium",
+          "style": "Medium",
+          "weight": 500,
+          "ctWeight": 0.23,
+          "italic": false,
+          "file": "Fredoka/Fredoka-VF.ttf"
+        },
+        {
+          "postScriptName": "Fredoka-SemiBold",
+          "style": "SemiBold",
+          "weight": 600,
+          "ctWeight": 0.3,
+          "italic": false,
+          "file": "Fredoka/Fredoka-VF.ttf"
+        },
+        {
+          "postScriptName": "Fredoka-Bold",
+          "style": "Bold",
+          "weight": 700,
+          "ctWeight": 0.4,
+          "italic": false,
+          "file": "Fredoka/Fredoka-VF.ttf"
+        }
+      ]
+    }
+  ],
+  "skipped": [
+    {
+      "directory": "permanentmarker",
+      "reason": "not under ofl/ in google/fonts (licence is not OFL)"
+    }
+  ]
+}

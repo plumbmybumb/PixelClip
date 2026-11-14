@@ -1,0 +1,10 @@
+## Managed (registry) dependencies, fetched by `idf.py build`.
+dependencies:
+  idf:
+    version: ">=5.5.0"
+  espressif/esp_lcd_sh8601:
+    version: "^2.0.1"
+  joltwallet/littlefs:
+    version: "^1.22.0"
+  espressif/mdns:
+    version: "^1.14.0"

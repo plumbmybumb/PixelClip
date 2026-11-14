@@ -1,0 +1,6 @@
+/* Demandes d’autorisation (français). */
+"CFBundleDisplayName" = "PixelClip";
+"NSLocalNetworkUsageDescription" = "PixelClip envoie des images et des réglages à votre barrette, via le Wi‑Fi de la barrette.";
+"NSPhotoLibraryUsageDescription" = "PixelClip utilise les photos et vidéos que vous choisissez pour créer des images pour votre barrette.";
+"NSPhotoLibraryAddUsageDescription" = "PixelClip enregistre dans vos photos les captures d’écran de votre barrette, quand vous le demandez.";
+"NSBluetoothAlwaysUsageDescription" = "PixelClip utilise le Bluetooth pour réveiller votre barrette et allumer son Wi‑Fi, sans que vous ayez à appuyer sur son bouton.";

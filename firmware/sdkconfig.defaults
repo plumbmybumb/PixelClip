@@ -1,0 +1,146 @@
+# Hair Clip — Waveshare ESP32-S3-AMOLED-1.91 (ESP32-S3R8, W25Q128 16 MB flash)
+CONFIG_IDF_TARGET="esp32s3"
+
+# Flash: QIO 80 MHz, 16 MB (schematic: W25Q128JV)
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# OTA with rollback (app marks itself valid 30 s after a healthy boot)
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# Crash diagnostics (README "Crash diagnostics (core dump)"): a panic (exception, abort/assert, interrupt
+# watchdog, stack overflow) writes an ELF core dump of every task (TCB + live part of its stack, no DRAM
+# capture) to the 56 KB `coredump` partition, then the panic handler prints and reboots as before. The
+# image stays until DELETE /coredump; components/health reports it at every boot (and does the integrity
+# check itself, so the IDF boot-time check is off).
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+CONFIG_ESP_COREDUMP_CHECKSUM_SHA256=y
+CONFIG_ESP_COREDUMP_CAPTURE_DRAM=n
+CONFIG_ESP_COREDUMP_CHECK_BOOT=n
+
+# PSRAM: in-package octal 8 MB @ 80 MHz
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+# Internal RAM diet (README "Internal RAM"; the 2026-10-14 session hang ran with 36 KB internal free, largest
+# block 25.6 KB). malloc() of more than 4 KB goes to PSRAM first (default 16 KB): request bodies, cJSON output,
+# third-party mid-size buffers. Stacks, FreeRTOS objects and DMA buffers ask for internal RAM explicitly.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
+
+# Console over the native USB Serial/JTAG (the board has no UART bridge)
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# CPU / power management: boot at 160, then esp_pm runs DFS 80..160 MHz with auto light sleep
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160=y
+CONFIG_PM_ENABLE=y
+CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
+CONFIG_FREERTOS_IDLE_TIME_BEFORE_SLEEP=3
+CONFIG_FREERTOS_HZ=1000
+# Keep the CPU powered in light sleep (IDF 5.5 default for the S3 is to power it down and restore its
+# context from an 8.6 KB retention buffer at every wake). After the battery hang (README "Light sleep on
+# battery") the least exercised path goes: costs ~0.65 mA in light sleep (a few % next to the panel),
+# gives back 8.6 KB of internal RAM. Re-enable on the bench (sdkconfig.bench) to bisect.
+CONFIG_PM_POWER_DOWN_CPU_IN_LIGHT_SLEEP=n
+# Light-sleep entry / exit callbacks (power.c): RTC breadcrumbs ("died in light sleep") and the assertion that
+# no light sleep happens while a session / fast-lane awake hold is held.
+CONFIG_PM_LIGHT_SLEEP_CALLBACKS=y
+# No 32 kHz crystal on this board: the 8MD256 source is far more stable than the 136 kHz RC,
+# which matters because system time is tracked by the RTC slow clock during light sleep.
+CONFIG_RTC_CLK_SRC_INT_8MD256=y
+
+# Compiler / logging
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# Tasks / watchdog
+# main = mode controller: runs esp_wifi_init / mdns_init / httpd_start / esp_wifi_deinit on its stack
+# (high-water mark is logged at every session end and by the boot diagnostics).
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_INIT=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
+
+# HTTP server
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
+CONFIG_HTTPD_MAX_URI_LEN=128
+CONFIG_HTTPD_PURGE_BUF_LEN=1024
+
+# mbedTLS: hardware SHA for asset / OTA hashing
+CONFIG_MBEDTLS_HARDWARE_SHA=y
+
+# Bluetooth: NimBLE peripheral only, for the BLE wake "doorbell" (components/ble, config ble_wake).
+# Legacy advertising, no pairing/bonding (the hotspot is WPA2), host memory in PSRAM. Two connections so the
+# clip keeps advertising (findable) while a central is connected; the newest central wins (pixelclip_ble.c).
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=2
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=n
+CONFIG_BT_NIMBLE_50_FEATURE_SUPPORT=n
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+CONFIG_BT_NIMBLE_LOG_LEVEL_WARNING=y
+CONFIG_BT_NIMBLE_SVC_GAP_DEVICE_NAME="PixelClip"
+# The GATT callbacks log and query player/battery state on the host task's stack (default 4096).
+CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=5120
+# Fast lane (PROTOCOL §3b): answer the central's MTU exchange with 517 (iOS: up to ~512), and enough mbufs
+# (PSRAM) for a few 517-byte notifications in flight (components/ble/pixelclip_ble.c flow control).
+CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=517
+CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT=24
+# Advertising/connection TX power 0 dBm (default +9): a phone within a few metres is all we need.
+CONFIG_BT_CTRL_DFT_TX_POWER_LEVEL_N0=y
+# Controller sleeps between BLE events so automatic light sleep keeps working. No 32 kHz crystal on
+# this board, so the low-power clock is the main XTAL, which then stays powered in light sleep.
+CONFIG_BT_CTRL_MODEM_SLEEP=y
+CONFIG_BT_CTRL_MODEM_SLEEP_MODE_1=y
+CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL=y
+CONFIG_BT_CTRL_MAIN_XTAL_PU_DURING_LIGHT_SLEEP=y
+# WiFi (SoftAP sessions) + BLE time-share the radio (ESP32-S3 software coexistence).
+CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y
+# Internal RAM diet for WiFi (README "Internal RAM"; Espressif's "memory saving" rank for octal PSRAM):
+# static RX and TX buffers are internal DMA memory, 1.6 KB each: 16+16 -> 6+6 = 32 KB back while the driver is
+# initialised. The BA window follows the RX buffers. Hot-path IRAM placement off: 17.7 KB of IRAM (= heap on the
+# S3, whose IRAM and DRAM share one pool). Throughput drops (fine for 200 KB atlases over a 1-station AP).
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=6
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=16
+CONFIG_ESP_WIFI_STATIC_TX_BUFFER_NUM=6
+CONFIG_ESP_WIFI_CACHE_TX_BUFFER_NUM=16
+CONFIG_ESP_WIFI_RX_BA_WIN=6
+CONFIG_ESP_WIFI_IRAM_OPT=n
+CONFIG_ESP_WIFI_RX_IRAM_OPT=n
+# WPA2-PSK SoftAP only: no WPA3 / enterprise code (33 KB flash, a little .bss).
+CONFIG_ESP_WIFI_ENABLE_WPA3_SAE=n
+CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
+# BLE controller: advertising + two connections = 3 activities (828 B internal each, default 6); no scanning.
+CONFIG_BT_CTRL_BLE_MAX_ACT=3
+CONFIG_BT_CTRL_SCAN_DUPL_CACHE_SIZE=10
+
+# mDNS: its task stack (4 KB) and its allocations in PSRAM (it never touches flash); AP interface only.
+CONFIG_MDNS_TASK_CREATE_FROM_SPIRAM=y
+CONFIG_MDNS_MEMORY_ALLOC_SPIRAM=y
+CONFIG_MDNS_ENABLE_CONSOLE_CLI=n
+CONFIG_MDNS_PREDEF_NETIF_STA=n
+CONFIG_MDNS_PREDEF_NETIF_ETH=n
+
+# LittleFS
+CONFIG_LITTLEFS_MAX_PARTITIONS=1
+CONFIG_LITTLEFS_OBJ_NAME_LEN=64
+
+# No auto light sleep on USB: power.c's USB hold (POWER_AWAKE_USB, held while usb_present and 5 s after,
+# README "USB light-sleep inhibit") replaces IDF's own inhibit. IDF's lock follows a 3-tick SOF timeout in
+# the FreeRTOS tick hook (usb_serial_jtag_connection_monitor.c), which the systick catch-up loop
+# (port_systick.c) releases after any >= 4 ms tick-interrupt delay; the clip then light-sleeps on USB, every
+# light sleep disables the USB-Serial-JTAG pad (sleep_modes.c) and the host loses the port. Off, so there is
+# one rule with one owner (the SOF monitor itself stays linked through the USJ console: usb_serial_jtag_is_connected()).
+CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION=n
+
+# IMU is mounted rotated 90 deg relative to the screen (bench finding 2026-10-11: gravity read as +x when upright)
+CONFIG_PIXELCLIP_IMU_SWAP_XY=y

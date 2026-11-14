@@ -1,0 +1,10 @@
+build/
+.DS_Store
+*.xcuserdata/
+DerivedData/
+__pycache__/
+*.pyc
+sdkconfig.old
+managed_components/
+firmware/test_host/build/
+tools/previews-scenes/out/

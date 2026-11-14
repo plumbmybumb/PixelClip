@@ -1,0 +1,15 @@
+menu "PixelClip health (RTC watchdog, liveness)"
+
+    config PIXELCLIP_RTC_WDT_TIMEOUT_S
+        int "RTC watchdog timeout (s)"
+        range 15 120
+        default 40
+        help
+            The RTC watchdog keeps counting in light sleep (unlike the task watchdog) and is fed by the
+            controller loop every 5 s while every required liveness source has checked in (health.h: player
+            30 s, power task 15 s, and during a WiFi session the httpd task 30 s and the lwIP thread 15 s,
+            the NimBLE host 30 s while BLE runs). If the chip sleeps without waking, or a source is silent,
+            it resets the chip after this time (system reset; a full RTC reset 5 s later if that did not
+            help). The boot log then says "reset reason RTCWDT_..." and names the silent source.
+
+endmenu

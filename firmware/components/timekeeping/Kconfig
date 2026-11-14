@@ -1,0 +1,12 @@
+menu "Timekeeping"
+
+config TIMEKEEPING_KEEP_RTC_MORE
+    bool "Keep a synced clock across USB / JTAG resets and short deep sleeps"
+    default n
+    help
+        The RTC timer keeps counting through ESP_RST_USB, ESP_RST_JTAG and a deep-sleep wake. With this on, those
+        resets keep a synced clock synced (a deep sleep only while it was shorter than 1 h; a longer one turns the
+        clock approximate for RC drift). Off (the default, the PixelClip): only software resets, panics and
+        watchdogs keep trust, as before.
+
+endmenu

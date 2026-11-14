@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>PixelClip</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>PixelClip uses Bluetooth to wake your clip and turn on its Wi‑Fi, so you don’t have to press its button.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>PixelClip sends pictures and settings to your clip over the clip’s own Wi‑Fi.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>PixelClip saves screenshots of your clip to your photo library when you ask.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PixelClip uses the photos and videos you pick to make pictures for your clip.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Fonts/PressStart2P/PressStart2P-Regular.ttf</string>
+		<string>Fonts/Silkscreen/Silkscreen-Regular.ttf</string>
+		<string>Fonts/Silkscreen/Silkscreen-Bold.ttf</string>
+		<string>Fonts/VT323/VT323-Regular.ttf</string>
+		<string>Fonts/DotGothic16/DotGothic16-Regular.ttf</string>
+		<string>Fonts/PixelifySans/PixelifySans-VF.ttf</string>
+		<string>Fonts/Tiny5/Tiny5-VF.ttf</string>
+		<string>Fonts/Bungee/Bungee-Regular.ttf</string>
+		<string>Fonts/Monoton/Monoton-Regular.ttf</string>
+		<string>Fonts/BebasNeue/BebasNeue-Regular.ttf</string>
+		<string>Fonts/RubikMonoOne/RubikMonoOne-Regular.ttf</string>
+		<string>Fonts/Righteous/Righteous-Regular.ttf</string>
+		<string>Fonts/Orbitron/Orbitron-VF.ttf</string>
+		<string>Fonts/Audiowide/Audiowide-Regular.ttf</string>
+		<string>Fonts/UnicaOne/UnicaOne-Regular.ttf</string>
+		<string>Fonts/AbrilFatface/AbrilFatface-Regular.ttf</string>
+		<string>Fonts/MajorMonoDisplay/MajorMonoDisplay-Regular.ttf</string>
+		<string>Fonts/Pacifico/Pacifico-Regular.ttf</string>
+		<string>Fonts/Lobster/Lobster-Regular.ttf</string>
+		<string>Fonts/DancingScript/DancingScript-VF.ttf</string>
+		<string>Fonts/Caveat/Caveat-VF.ttf</string>
+		<string>Fonts/PlayfairDisplay/PlayfairDisplay-VF.ttf</string>
+		<string>Fonts/PlayfairDisplay/PlayfairDisplay-Italic-VF.ttf</string>
+		<string>Fonts/SpaceGrotesk/SpaceGrotesk-VF.ttf</string>
+		<string>Fonts/Fredoka/Fredoka-VF.ttf</string>
+	</array>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIUserInterfaceStyle</key>
+	<string>Automatic</string>
+</dict>
+</plist>

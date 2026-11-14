@@ -1,0 +1,47 @@
+menu "PixelClip IMU (QMI8658C)"
+
+    config PIXELCLIP_IMU_ENABLE
+        bool "Use the QMI8658C accelerometer"
+        default y
+        help
+            I2C on SCL=GPIO39 / SDA=GPIO40, 400 kHz. When disabled (or the chip is not found) live
+            scenes use a fixed downward gravity.
+
+    config PIXELCLIP_IMU_FLIP_X
+        bool "Flip display-frame X (left/right) of the gravity vector"
+        default n
+        help
+            Bench fix for the axis assumption in components/imu/imu.c (IMU_AXIS_MAP). With the clip
+            upright and its RIGHT edge tilted down, GET /imu must report g[0] > 0. If it is negative,
+            enable this.
+
+    config PIXELCLIP_IMU_FLIP_Y
+        bool "Flip display-frame Y (up/down) of the gravity vector"
+        default n
+        help
+            Upright clip (display landscape, readable): GET /imu must report g[1] close to +1.
+            If it reads -1, enable this.
+
+    config PIXELCLIP_IMU_FLIP_Z
+        bool "Flip display-frame Z (out of / into the glass) of the gravity vector"
+        default n
+        help
+            Clip lying face up (glass toward the sky): GET /imu must report g[2] close to -1.
+            If it reads +1, enable this.
+
+    config PIXELCLIP_IMU_SWAP_XY
+        bool "Swap display-frame X and Y (chip rotated 90 degrees on the board)"
+        default n
+        help
+            Applied before the flips. Enable if tilting the clip left/right moves g[1] instead of
+            g[0] (upright then reads g[0] = +-1 instead of g[1]).
+
+    config PIXELCLIP_IMU_LOW_POWER
+        bool "Accelerometer low-power mode (128 Hz ODR) instead of normal mode (62.5 Hz)"
+        default n
+        help
+            The QMI8658C low-power accelerometer rates are 128/21/11/3 Hz; only 128 Hz is fast enough
+            for the 50 Hz sampling. Normal mode at 62.5 Hz is the default (verified register values
+            from the Waveshare demo family); try this on the bench to save a little current.
+
+endmenu

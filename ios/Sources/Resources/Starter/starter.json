@@ -1,0 +1,145 @@
+{
+ "version": 1,
+ "pieces": [
+  {
+   "slug": "aurora",
+   "title": "Aurora",
+   "description": "Green-to-violet aurora curtains with shimmering rays over a dark starry sky.",
+   "file": "aurora.hca",
+   "bytes": 344156
+  },
+  {
+   "slug": "dandelion-drift",
+   "title": "Dandelion Drift",
+   "description": "A dandelion clock sways; seeds let go one by one and sail right on a breeze while the head regrows them.",
+   "file": "dandelion-drift.hca",
+   "bytes": 462606
+  },
+  {
+   "slug": "fern-unfurl",
+   "title": "Fern Unfurling",
+   "description": "Fiddleheads uncoil into arching fronds; every leaflet unrolls from its own curl, lime deepening to fern green.",
+   "file": "fern-unfurl.hca",
+   "bytes": 477736
+  },
+  {
+   "slug": "fireflies",
+   "title": "Fireflies",
+   "description": "Fireflies drift and blink over a dark meadow under a few stars.",
+   "file": "fireflies.hca",
+   "bytes": 371386
+  },
+  {
+   "slug": "flow-silk",
+   "title": "Flow Silk",
+   "description": "Fine mint and lime threads drifting through a slowly turning flow field, each trail fading behind it.",
+   "file": "flow-silk.hca",
+   "bytes": 363936
+  },
+  {
+   "slug": "gradient-breathe",
+   "title": "Warm breath",
+   "description": "A warm seam of light across the clip, slowly breathing in and out; very low power.",
+   "file": "gradient-breathe.hca",
+   "bytes": 34236
+  },
+  {
+   "slug": "hearts",
+   "title": "Hearts",
+   "description": "A few pastel hearts float up with a gentle sway and fade away.",
+   "file": "hearts.hca",
+   "bytes": 338402
+  },
+  {
+   "slug": "lava-jade",
+   "title": "Jade Lava",
+   "description": "Slow emerald metaballs merging and parting; cores glow mint where they touch.",
+   "file": "lava-jade.hca",
+   "bytes": 304526
+  },
+  {
+   "slug": "lissajous-comet",
+   "title": "Lissajous Comet",
+   "description": "A point of light traces a slowly turning 3:2 Lissajous knot; its ink cools from gold to teal and fades.",
+   "file": "lissajous-comet.hca",
+   "bytes": 393888
+  },
+  {
+   "slug": "murmuration",
+   "title": "Murmuration",
+   "description": "Hundreds of tiny white birds fold, thin out and thicken as one flock, drifting in a slow figure of eight.",
+   "file": "murmuration.hca",
+   "bytes": 304696
+  },
+  {
+   "slug": "pixel-cat",
+   "title": "Pixel cat",
+   "description": "A tiny ginger pixel cat trots across a pixel night under a crescent moon.",
+   "file": "pixel-cat.hca",
+   "bytes": 273352
+  },
+  {
+   "slug": "reaction-mitosis",
+   "title": "Reaction Mitosis",
+   "description": "Gray-Scott reaction-diffusion: one seed divides into a colony that spreads to the edges of the screen, then rewinds to the seed and grows again.",
+   "file": "reaction-mitosis.hca",
+   "bytes": 1240586
+  },
+  {
+   "slug": "sakura",
+   "title": "Sakura",
+   "description": "Cherry-blossom petals and a few whole blossoms tumble diagonally on the breeze.",
+   "file": "sakura.hca",
+   "bytes": 404644
+  },
+  {
+   "slug": "sprout-trio",
+   "title": "Three Sprouts",
+   "description": "In a cut-away of dark soil three seeds crack, root, hook up, open seed leaves and unfold their first true leaves.",
+   "file": "sprout-trio.hca",
+   "bytes": 311090
+  },
+  {
+   "slug": "starfield",
+   "title": "Starfield",
+   "description": "Slow parallax starfield, gentle twinkle, one shooting star per loop.",
+   "file": "starfield.hca",
+   "bytes": 285170
+  },
+  {
+   "slug": "still-cherries",
+   "title": "Cherries",
+   "description": "A big glossy pair of cherries drawn from simple shapes.",
+   "file": "still-cherries.hca",
+   "bytes": 10032
+  },
+  {
+   "slug": "still-deco",
+   "title": "Art d\u00e9co",
+   "description": "Art-Deco scallop pattern of concentric gold fans.",
+   "file": "still-deco.hca",
+   "bytes": 99602
+  },
+  {
+   "slug": "sunflower-bloom",
+   "title": "Sunflower Bloom",
+   "description": "A green bud parts, golden petals unfold and florets spiral in at the golden angle; then it gently closes.",
+   "file": "sunflower-bloom.hca",
+   "bytes": 381946
+  },
+  {
+   "slug": "vine-climb",
+   "title": "Climbing Vine",
+   "description": "A vine feels its way across the screen; leaves unfold node by node, tendrils coil, peach blossoms open.",
+   "file": "vine-climb.hca",
+   "bytes": 401288
+  },
+  {
+   "slug": "wave-lines",
+   "title": "Wave lines",
+   "description": "Thin orange and amber sine lines flowing across the clip.",
+   "file": "wave-lines.hca",
+   "bytes": 437390
+  }
+ ]
+}

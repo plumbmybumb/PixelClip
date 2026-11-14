@@ -1,0 +1,8 @@
+# Bench light-sleep soak build (README "Light sleep on battery"), layered on sdkconfig.defaults:
+#   BENCH=1 scripts/flash.sh          (builds in build-bench/ with its own sdkconfig, flashes, captures)
+#   scripts/sleep_soak.sh 60          (console across reconnects for 60 min: reboots, RTCWDT resets)
+# NOT for the clip: the chip light-sleeps while USB is connected, so the console comes and goes.
+CONFIG_PIXELCLIP_BENCH_SLEEP_TEST=y
+CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION=n
+# Light-sleep counters and time-in-sleep for the bench status line (esp_pm_dump_locks).
+CONFIG_PM_PROFILING=y

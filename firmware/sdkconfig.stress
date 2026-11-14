@@ -1,0 +1,6 @@
+# Bench stress-session build (README "Bench: stress session, watchdog and crash tests"), layered on
+# sdkconfig.defaults:  STRESS=1 scripts/flash.sh   (builds build-stress/ with its own sdkconfig, flashes, captures)
+# NOT for the clip: it replaces the playlist with the water scene and stores a 200 KB atlas every 30 s.
+# USB stays connected (no light sleep on USB, as in production), so the console shows everything.
+CONFIG_PIXELCLIP_BENCH_STRESS=y
+CONFIG_PIXELCLIP_BENCH_ROUTES=y

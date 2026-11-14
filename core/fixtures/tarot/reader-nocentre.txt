@@ -1,0 +1,631 @@
+text before any header is ignored
+[question]
+Q {q.name}: {q.question}
+{q.name} {Z.kw} has a bad placeholder
+{q.name unclosed
+[couple.0-21]
+Couple {A.name}+{B.name}.
+[couple.0-21.any]
+Couple any {A.name}+{B.name}.
+[couple.1-11]
+Couple {A.name}+{B.name}.
+[couple.1-11.any]
+Couple any {A.name}+{B.name}.
+[couple.2-5]
+Couple {A.name}+{B.name}.
+[couple.2-5.any]
+Couple any {A.name}+{B.name}.
+[couple.3-4]
+Couple {A.name}+{B.name}.
+[couple.3-4.any]
+Couple any {A.name}+{B.name}.
+[couple.7-17]
+Couple {A.name}+{B.name}.
+[couple.7-17.any]
+Couple any {A.name}+{B.name}.
+[couple.8-9]
+Couple {A.name}+{B.name}.
+[couple.8-9.any]
+Couple any {A.name}+{B.name}.
+[couple.18-19]
+Couple {A.name}+{B.name}.
+[couple.18-19.any]
+Couple any {A.name}+{B.name}.
+[couple.5-5]
+a couple with itself is ignored
+[couple.5-x.any]
+not a card number: ignored
+[meet.1-2]
+Meet {A.name}>{B.name}.
+[meet.2-1]
+Meet back {A.name}>{B.name}.
+[meet.4-6]
+Meet {A.name}>{B.name}.
+[meet.3-3]
+a meeting with itself is ignored
+[gaze.front]
+{B.name} looks at you.
+[gaze.facing]
+{A.name} faces {B.name}.
+[gaze.back]
+{A.name} turns from {B.name}.
+[gaze.follow]
+{A.name} follows {B.name}.
+[kin.sum21]
+{A.name}+{B.name}=21.
+[kin.same]
+{A.name}~{B.name}.
+[arc.rising]
+Rising ({A.num}, {B.num}, {C.num}): {A.kw}, {B.kw}, {C.kw}.
+[arc.falling]
+Falling ({A.num}, {B.num}, {C.num}): {A.kw}, {B.kw}, {C.kw}.
+[arc.peak]
+Peak ({A.num}, {B.num}, {C.num}): {A.kw}, {B.kw}, {C.kw}.
+[arc.dip]
+Dip ({A.num}, {B.num}, {C.num}): {A.kw}, {B.kw}, {C.kw}.
+[arc.plateau]
+Plateau ({A.num}, {B.num}, {C.num}): {A.kw}, {B.kw}, {C.kw}.
+[arc.still]
+Still ({A.num}, {B.num}, {C.num}): {A.kw}, {B.kw}, {C.kw}.
+[positions]
+Centre {B.name}, {B.role}; from {A.from} to {C.to}.
+[echo]
+Echo: {tag}.
+[closing]
+not a section: ignored
+[unknown.section]
+ignored too
+
+[depth]
+deep
+a second depth line is ignored
+[tag.water]
+water
+[tag.crown]
+crown
+[tag.path]
+path
+[tag.angel]
+angel
+[tag.book]
+book
+[tag.wheel]
+wheel
+[tag.sword]
+sword
+[tag.hand]
+hand
+[tag.unicorn]
+a tag outside the fixed list is ignored
+[card.99.name]
+out of range: ignored
+[card.1.colour]
+an unknown field: ignored
+[card.0.name]
+Zero
+[card.0.kw]
+kw0
+[card.0.num]
+0
+[card.0.role]
+role0
+[card.0.from]
+from0
+[card.0.to]
+to0
+[card.0.closing]
+Closing 0.
+[card.0.question]
+Question 0?
+[card.0.gaze]
+right
+[card.0.degree]
+0
+[card.0.row]
+0
+[card.0.symbols]
+path,water
+[card.1.name]
+One
+[card.1.kw]
+kw1
+[card.1.num]
+I
+[card.1.role]
+role1
+[card.1.from]
+from1
+[card.1.to]
+to1
+[card.1.closing]
+Closing 1.
+[card.1.question]
+Question 1?
+[card.1.gaze]
+left
+[card.1.degree]
+1
+[card.1.row]
+1
+[card.1.symbols]
+hand,staff
+[card.2.name]
+Two
+[card.2.kw]
+kw2
+[card.2.num]
+II
+[card.2.role]
+role2
+[card.2.from]
+from2
+[card.2.to]
+to2
+[card.2.closing]
+Closing 2.
+[card.2.question]
+Question 2?
+[card.2.gaze]
+front
+[card.2.degree]
+2
+[card.2.row]
+1
+[card.2.symbols]
+book
+[card.3.name]
+Three
+[card.3.kw]
+kw3
+[card.3.num]
+III
+[card.3.role]
+role3
+[card.3.from]
+from3
+[card.3.to]
+to3
+[card.3.closing]
+Closing 3.
+[card.3.question]
+Question 3?
+[card.3.gaze]
+right
+[card.3.degree]
+3
+[card.3.row]
+1
+[card.3.symbols]
+crown,flower
+[card.4.name]
+Four
+[card.4.kw]
+kw4
+[card.4.num]
+IIII
+[card.4.role]
+role4
+[card.4.from]
+from4
+[card.4.to]
+to4
+[card.4.closing]
+Closing 4.
+[card.4.question]
+Question 4?
+[card.4.gaze]
+left
+[card.4.degree]
+4
+[card.4.row]
+1
+[card.4.symbols]
+crown
+[card.5.name]
+Five
+[card.5.kw]
+kw5
+[card.5.num]
+V
+[card.5.role]
+role5
+[card.5.from]
+from5
+[card.5.to]
+to5
+[card.5.closing]
+Closing 5.
+[card.5.question]
+Question 5?
+[card.5.gaze]
+front
+[card.5.degree]
+5
+[card.5.row]
+1
+[card.5.symbols]
+book
+[card.6.name]
+Six
+[card.6.kw]
+kw6
+[card.6.num]
+VI
+[card.6.role]
+role6
+[card.6.from]
+from6
+[card.6.to]
+to6
+[card.6.closing]
+Closing 6.
+[card.6.question]
+Question 6?
+[card.6.gaze]
+right
+[card.6.degree]
+6
+[card.6.row]
+1
+[card.6.symbols]
+angel
+[card.7.name]
+Seven
+[card.7.kw]
+kw7
+[card.7.num]
+VII
+[card.7.role]
+role7
+[card.7.from]
+from7
+[card.7.to]
+to7
+[card.7.closing]
+Closing 7.
+[card.7.question]
+Question 7?
+[card.7.gaze]
+right
+[card.7.degree]
+7
+[card.7.row]
+1
+[card.7.symbols]
+wheel
+[card.8.name]
+Eight
+[card.8.kw]
+kw8
+[card.8.num]
+VIII
+[card.8.role]
+role8
+[card.8.from]
+from8
+[card.8.to]
+to8
+[card.8.closing]
+Closing 8.
+[card.8.question]
+Question 8?
+[card.8.gaze]
+left
+[card.8.degree]
+8
+[card.8.row]
+1
+[card.8.symbols]
+sword
+[card.9.name]
+Nine
+[card.9.kw]
+kw9
+[card.9.num]
+VIIII
+[card.9.role]
+role9
+[card.9.from]
+from9
+[card.9.to]
+to9
+[card.9.closing]
+Closing 9.
+[card.9.question]
+Question 9?
+[card.9.gaze]
+left
+[card.9.degree]
+9
+[card.9.row]
+1
+[card.9.symbols]
+path
+[card.10.name]
+Ten
+[card.10.kw]
+kw10
+[card.10.num]
+X
+[card.10.role]
+role10
+[card.10.from]
+from10
+[card.10.to]
+to10
+[card.10.closing]
+Closing 10.
+[card.10.question]
+Question 10?
+[card.10.gaze]
+front
+[card.10.degree]
+10
+[card.10.row]
+1
+[card.10.symbols]
+wheel
+[card.11.name]
+Eleven
+[card.11.kw]
+kw11
+[card.11.num]
+XI
+[card.11.role]
+role11
+[card.11.from]
+from11
+[card.11.to]
+to11
+[card.11.closing]
+Closing 11.
+[card.11.question]
+Question 11?
+[card.11.gaze]
+right
+[card.11.degree]
+1
+[card.11.row]
+2
+[card.11.symbols]
+animal
+[card.12.name]
+Twelve
+[card.12.kw]
+kw12
+[card.12.num]
+XII
+[card.12.role]
+role12
+[card.12.from]
+from12
+[card.12.to]
+to12
+[card.12.closing]
+Closing 12.
+[card.12.question]
+Question 12?
+[card.12.gaze]
+front
+[card.12.degree]
+2
+[card.12.row]
+2
+[card.12.symbols]
+hand
+[card.13.name]
+Thirteen
+[card.13.kw]
+kw13
+[card.13.num]
+XIII
+[card.13.role]
+role13
+[card.13.from]
+from13
+[card.13.to]
+to13
+[card.13.closing]
+Closing 13.
+[card.13.question]
+Question 13?
+[card.13.gaze]
+left
+[card.13.degree]
+3
+[card.13.row]
+2
+[card.13.symbols]
+sword
+[card.14.name]
+Fourteen
+[card.14.kw]
+kw14
+[card.14.num]
+XIIII
+[card.14.role]
+role14
+[card.14.from]
+from14
+[card.14.to]
+to14
+[card.14.closing]
+Closing 14.
+[card.14.question]
+Question 14?
+[card.14.gaze]
+left
+[card.14.degree]
+4
+[card.14.row]
+2
+[card.14.symbols]
+cup,angel
+[card.15.name]
+Fifteen
+[card.15.kw]
+kw15
+[card.15.num]
+XV
+[card.15.role]
+role15
+[card.15.from]
+from15
+[card.15.to]
+to15
+[card.15.closing]
+Closing 15.
+[card.15.question]
+Question 15?
+[card.15.gaze]
+front
+[card.15.degree]
+5
+[card.15.row]
+2
+[card.15.symbols]
+animal
+[card.16.name]
+Sixteen
+[card.16.kw]
+kw16
+[card.16.num]
+XVI
+[card.16.role]
+role16
+[card.16.from]
+from16
+[card.16.to]
+to16
+[card.16.closing]
+Closing 16.
+[card.16.question]
+Question 16?
+[card.16.gaze]
+right
+[card.16.degree]
+6
+[card.16.row]
+2
+[card.16.symbols]
+tower
+[card.17.name]
+Seventeen
+[card.17.kw]
+kw17
+[card.17.num]
+XVII
+[card.17.role]
+role17
+[card.17.from]
+from17
+[card.17.to]
+to17
+[card.17.closing]
+Closing 17.
+[card.17.question]
+Question 17?
+[card.17.gaze]
+left
+[card.17.degree]
+7
+[card.17.row]
+2
+[card.17.symbols]
+star,water
+[card.18.name]
+Eighteen
+[card.18.kw]
+kw18
+[card.18.num]
+XVIII
+[card.18.role]
+role18
+[card.18.from]
+from18
+[card.18.to]
+to18
+[card.18.closing]
+Closing 18.
+[card.18.question]
+Question 18?
+[card.18.gaze]
+front
+[card.18.degree]
+8
+[card.18.row]
+2
+[card.18.symbols]
+moon,water
+[card.19.name]
+Nineteen
+[card.19.kw]
+kw19
+[card.19.num]
+XVIIII
+[card.19.role]
+role19
+[card.19.from]
+from19
+[card.19.to]
+to19
+[card.19.closing]
+Closing 19.
+[card.19.question]
+Question 19?
+[card.19.gaze]
+front
+[card.19.degree]
+9
+[card.19.row]
+2
+[card.19.symbols]
+sun,child
+[card.20.name]
+Twenty
+[card.20.kw]
+kw20
+[card.20.num]
+XX
+[card.20.role]
+role20
+[card.20.from]
+from20
+[card.20.to]
+to20
+[card.20.closing]
+Closing 20.
+[card.20.question]
+Question 20?
+[card.20.gaze]
+front
+[card.20.degree]
+10
+[card.20.row]
+2
+[card.20.symbols]
+angel
+[card.21.name]
+World
+[card.21.kw]
+kw21
+[card.21.num]
+XXI
+[card.21.role]
+role21
+[card.21.from]
+from21
+[card.21.to]
+to21
+[card.21.closing]
+Closing 21.
+[card.21.question]
+Question 21?
+[card.21.gaze]
+front
+[card.21.degree]
+21
+[card.21.row]
+3
+[card.21.symbols]
+crown

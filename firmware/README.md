@@ -1424,6 +1424,35 @@ detected by the SOF monitor only while the chip is awake (pad on), or by the VBU
 lifts Vbat ≥ 4.25 V; a nearly full cell resting below that on a host that never gets to send SOF can delay the hold
 (the BOOT button or any session wakes it; the first SOF seen then takes the hold).
 
+## Bench: display bus stress
+
+The display driver (`components/display/display.c`) never asks for the SPI bus while the interrupt of the previous
+colour transfer may still be finishing: it waits for each band (`s_done`), then for the interrupt itself
+(`bus_settle()`), and only then makes the next `esp_lcd` call.
+
+Why: with ESP-IDF 5.5.0 the player froze for ever inside `spi_device_acquire_bus()` (called by every `esp_lcd`
+parameter or colour write), with every other task idle, until the RTC watchdog reset the clip. Seen once after
+5.8 hours of plain playback and reproduced in seconds by the stress build below. Reading
+`esp_hw_support/spi_bus_lock.c`: when the SPI interrupt finds its queue empty it decides that no task is waiting
+(`schedule_core`), then clears its pending bit and leaves (`bg_exit_core` only looks at the background bits).
+A task on the other core that sets its lock bit between those two steps still sees the pending bit, so it waits
+for a hand-over that never comes, and that wait has no timeout. The old flush loop asked for the bus for band
+n+1 while band n was still on the wire, so any request that happened to land on the end of a transfer could
+be lost. Waiting first means the request always finds the bus idle and succeeds at once.
+
+```sh
+# NOT for the clip. A task on core 1 re-sends two bands of the picture (nothing changes on screen) with the
+# second band's request swept in 1 us steps across the first band's transfer, plus a tiny flush behind it.
+LCDRACE=1 SECONDS_CAPTURE=150 scripts/flash.sh      # build-lcdrace/ (sdkconfig.defaults + sdkconfig.lcdrace)
+grep -E 'lcdrace|liveness|rst:' firmware/last_boot.log
+```
+
+A healthy run logs `lcdrace: N rounds ... K sweeps` every 5 s for as long as it runs. Without the wait in
+`flush_region()` the count stopped within the first sweep (about 8 s) on both tries, the liveness check printed
+the stuck backtrace (`dev_wait` <- `spi_bus_lock_acquire_start` <- `spi_device_acquire_bus` <-
+`panel_io_spi_tx_param`) and the RTC watchdog reset the clip. The full-frame flush time is unchanged
+(15.4 ms before and after).
+
 ## Bench: stress session, watchdog and crash tests
 
 ```sh

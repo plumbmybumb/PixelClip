@@ -19,6 +19,7 @@
 #include "esp_lcd_sh8601.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
+#include "esp_ipc.h"
 #include "esp_log.h"
 #include "esp_check.h"
 #include "sdkconfig.h"
@@ -35,6 +36,7 @@ static const char *TAG = "display";
 #define PIN_LCD_D3   5
 #define PIN_LCD_RST  17
 #define LCD_HOST     SPI2_HOST
+#define LCD_ISR_CORE 0   /* the core the SPI interrupt is put on (panel_init); bus_settle() relies on it */
 /* Panel enable (CONFIG_PIXELCLIP_LCD_EN_GPIO): -1 on the Waveshare board; GPIO38 on the LilyGo T-Display-S3
  * AMOLED V2, which must be high before the panel is reset. */
 #define PIN_LCD_EN   CONFIG_PIXELCLIP_LCD_EN_GPIO
@@ -112,6 +114,13 @@ typedef struct {
 } overlay_t;
 static overlay_t s_ovls[DISPLAY_OVERLAY_SLOTS]; /* written under s_lock, read by flush_region (also under it) */
 
+#if CONFIG_PIXELCLIP_BENCH_LCD_RACE
+#include "esp_rom_sys.h"
+/* Bench only (main/bench.c, display bus stress): a busy-wait before every band after the first, so the
+ * request for the bus can be placed at any moment of the previous band's transfer. Set under display_lock(). */
+volatile uint32_t g_display_bench_gap_us;
+#endif
+
 static bool IRAM_ATTR on_color_done(esp_lcd_panel_io_handle_t io, esp_lcd_panel_io_event_data_t *e, void *ctx)
 {
     BaseType_t woken = pdFALSE;
@@ -121,6 +130,43 @@ static bool IRAM_ATTR on_color_done(esp_lcd_panel_io_handle_t io, esp_lcd_panel_
      * partial redraws) */
     if (woken == pdTRUE && xPortInIsrContext()) portYIELD_FROM_ISR();
     return woken == pdTRUE;
+}
+
+#if !CONFIG_FREERTOS_UNICORE
+static void settle_nop(void *arg) { (void)arg; }
+#endif
+
+/* Returns once the SPI interrupt that reported a finished colour transfer has returned.
+ *
+ * Why (2026-11-15, the freeze that ended in an RTC watchdog reset, reproduced in seconds by
+ * CONFIG_PIXELCLIP_BENCH_LCD_RACE): ESP-IDF 5.5.0's SPI bus lock can lose the hand-over of the bus. When the
+ * interrupt finds its queue empty it decides nobody is waiting, then clears its "busy" bit and leaves. A task on
+ * the other core that asks for the bus (spi_device_acquire_bus, the first thing every esp_lcd call does)
+ * inside those few instructions still sees "busy", waits for the interrupt to hand the bus over, and is
+ * never woken: the wait has no timeout. So this driver never asks for the bus while that interrupt may be
+ * finishing: every colour transfer is waited for (s_done, given inside the interrupt), then this function makes
+ * sure the interrupt is over, and only then comes the next esp_lcd call. With the bus idle the request
+ * succeeds at once and needs no hand-over.
+ *
+ * A task that runs on the interrupt's core after s_done was given is proof enough (the interrupt cannot be
+ * in progress there); from the other core a blocking call to that core's IPC task is: that task only runs
+ * once the interrupt has returned. */
+static void bus_settle(void)
+{
+#if !CONFIG_FREERTOS_UNICORE
+    if (xPortGetCoreID() != LCD_ISR_CORE) esp_ipc_call_blocking(LCD_ISR_CORE, settle_nop, NULL);
+#endif
+}
+
+/* Wait for the band on the wire, then for its interrupt (bus_settle). Call with the display lock held. */
+static esp_err_t band_wait(const char *what)
+{
+    if (xSemaphoreTake(s_done, pdMS_TO_TICKS(500)) != pdTRUE) {
+        ESP_LOGE(TAG, "%s timeout", what);
+        return ESP_ERR_TIMEOUT;
+    }
+    bus_settle();
+    return ESP_OK;
 }
 
 static esp_err_t tx_cmd(uint8_t cmd, const void *param, size_t len)
@@ -166,8 +212,9 @@ static esp_err_t panel_init(void)
     ESP_RETURN_ON_ERROR(gpio_set_level((gpio_num_t)PIN_LCD_EN, 1), TAG, "enable high");
     vTaskDelay(pdMS_TO_TICKS(20));
 #endif
-    const spi_bus_config_t bus = SH8601_PANEL_BUS_QSPI_CONFIG(PIN_LCD_PCLK, PIN_LCD_D0, PIN_LCD_D1,
-                                                              PIN_LCD_D2, PIN_LCD_D3, BOUNCE_BYTES);
+    spi_bus_config_t bus = SH8601_PANEL_BUS_QSPI_CONFIG(PIN_LCD_PCLK, PIN_LCD_D0, PIN_LCD_D1,
+                                                        PIN_LCD_D2, PIN_LCD_D3, BOUNCE_BYTES);
+    bus.isr_cpu_id = ESP_INTR_CPU_AFFINITY_0;   /* LCD_ISR_CORE: bus_settle() must know where the interrupt runs */
     /* Demo uses max_transfer_sz = whole frame; we never send more than one band per transaction. */
     ESP_RETURN_ON_ERROR(spi_bus_initialize(LCD_HOST, &bus, SPI_DMA_CH_AUTO), TAG, "spi bus init");
 
@@ -273,7 +320,7 @@ static esp_err_t flush_region(int x, int y, int w, int h)
     /* Even band height keeps every band's RASET start even (2-pixel window granularity). */
     const int rows_per_band = (BOUNCE_BYTES / (w * 2)) & ~1;
     const size_t row_bytes = (size_t)w * 2;
-    int issued = 0;
+    bool on_wire = false;   /* the previous band's transfer has been queued and not yet waited for */
     esp_err_t err = ESP_OK;
     /* A previous flush that timed out may still deliver late "done" gives: drop them so they are
      * not counted against this flush (nothing is in flight here: we hold the lock). */
@@ -283,8 +330,8 @@ static esp_err_t flush_region(int x, int y, int w, int h)
         int rows = (y + h) - band_y;
         if (rows > rows_per_band) rows = rows_per_band;
         uint8_t *dst = s_bounce[n & 1];
-        /* The buffer we are about to fill was used by band n-2, which is complete: the panel IO
-         * waits for all queued colour transfers before sending band n-1's CASET/RASET. */
+        /* The buffer we are about to fill was used by band n-2, which is complete: band n-1 was only
+         * sent after it (band_wait below). The copy overlaps band n-1's transfer. */
         if (x == 0 && w == DISPLAY_W) {
             memcpy(dst, &s_fb[band_y * DISPLAY_W], row_bytes * rows);
         } else {
@@ -293,20 +340,23 @@ static esp_err_t flush_region(int x, int y, int w, int h)
             }
         }
         overlay_patch(dst, x, band_y, w, rows);
+#if CONFIG_PIXELCLIP_BENCH_LCD_RACE
+        if (n > 0 && g_display_bench_gap_us) esp_rom_delay_us(g_display_bench_gap_us);
+#endif
+        /* Never ask for the bus while the previous band's interrupt may be finishing: see bus_settle(). */
+        if (on_wire) {
+            on_wire = false;
+            if (band_wait("flush") != ESP_OK) return ESP_ERR_TIMEOUT;
+        }
         err = esp_lcd_panel_draw_bitmap(s_panel, x, band_y, x + w, band_y + rows, dst);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "draw_bitmap failed: %s", esp_err_to_name(err));
             break;
         }
-        issued++;
+        on_wire = true;
     }
-    /* Wait for every issued band to finish so the bounce buffers are free when we return. */
-    for (int i = 0; i < issued; i++) {
-        if (xSemaphoreTake(s_done, pdMS_TO_TICKS(500)) != pdTRUE) {
-            ESP_LOGE(TAG, "flush timeout");
-            return ESP_ERR_TIMEOUT;
-        }
-    }
+    /* Wait for the last band so the bounce buffers and the bus are free when we return. */
+    if (on_wire && band_wait("flush") != ESP_OK) return ESP_ERR_TIMEOUT;
     return err;
 }
 
@@ -319,7 +369,7 @@ esp_err_t display_render_rows(int y, int h, display_rows_fn_t fn, void *arg, boo
     if (y1 <= y0) return ESP_OK;
     const size_t row_bytes = (size_t)DISPLAY_W * 2;
     esp_err_t err = ESP_OK;
-    int issued = 0;
+    bool on_wire = false;   /* as in flush_region */
     display_lock();
     if (!s_panel_ok) {
         for (int band_y = y0; band_y < y1; band_y += BOUNCE_ROWS) {
@@ -338,6 +388,12 @@ esp_err_t display_render_rows(int y, int h, display_rows_fn_t fn, void *arg, boo
         fn((uint16_t *)dst, band_y, rows, arg);
         if (keep_fb && ovl) memcpy(&s_fb[band_y * DISPLAY_W], dst, row_bytes * rows);
         overlay_patch(dst, 0, band_y, DISPLAY_W, rows);
+        /* Never ask for the bus while the previous band's interrupt may be finishing: see bus_settle(). */
+        if (on_wire) {
+            on_wire = false;
+            err = band_wait("render");
+            if (err != ESP_OK) break;
+        }
         err = esp_lcd_panel_draw_bitmap(s_panel, 0, band_y, DISPLAY_W, band_y + rows, dst);
         /* 2026-11-10: without an overlay the copy runs while the band itself is sent (the DMA only reads dst), not
          * before it: each range's first band reaches the panel about 0.8 ms sooner */
@@ -346,15 +402,9 @@ esp_err_t display_render_rows(int y, int h, display_rows_fn_t fn, void *arg, boo
             ESP_LOGE(TAG, "draw_bitmap failed: %s", esp_err_to_name(err));
             break;
         }
-        issued++;
+        on_wire = true;
     }
-    for (int i = 0; i < issued; i++) {
-        if (xSemaphoreTake(s_done, pdMS_TO_TICKS(500)) != pdTRUE) {
-            ESP_LOGE(TAG, "render timeout");
-            err = ESP_ERR_TIMEOUT;
-            break;
-        }
-    }
+    if (on_wire && band_wait("render") != ESP_OK) err = ESP_ERR_TIMEOUT;
     display_unlock();
     return err;
 }

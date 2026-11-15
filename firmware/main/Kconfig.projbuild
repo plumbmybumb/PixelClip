@@ -80,6 +80,17 @@ menu "PixelClip"
         depends on PIXELCLIP_BENCH_STRESS
         default 30
 
+    config PIXELCLIP_BENCH_LCD_RACE
+        bool "Bench: display bus hand-over stress (NOT for the clip)"
+        default n
+        help
+            Bench reproduction of the display freeze (README "Bench: display bus stress"): a task on the other
+            core than the SPI interrupt re-sends tiny rectangles of the framebuffer as fast as it can, with a
+            swept delay between them, so that a request for the bus keeps landing at the moment the previous
+            transfer's interrupt finishes. Nothing changes on screen. Logs a count every 5 s; a count that
+            stops (and the RTC watchdog reset that follows) is the freeze. Build with sdkconfig.lcdrace
+            (LCDRACE=1 scripts/flash.sh).
+
     config PIXELCLIP_BENCH_ROUTES
         bool "Bench: POST /bench/crash and /bench/wedge (NOT for the clip)"
         default y if PIXELCLIP_BENCH_SLEEP_TEST || PIXELCLIP_BENCH_STRESS

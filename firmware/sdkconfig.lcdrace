@@ -1,0 +1,4 @@
+# Bench display bus stress (README "Bench: display bus stress"), layered on sdkconfig.defaults:
+#   LCDRACE=1 scripts/flash.sh   (builds build-lcdrace/ with its own sdkconfig, flashes, captures)
+# NOT for the clip: a task re-sends tiny rectangles of the picture as fast as it can.
+CONFIG_PIXELCLIP_BENCH_LCD_RACE=y

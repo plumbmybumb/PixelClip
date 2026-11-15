@@ -8,6 +8,8 @@
 #   ERASE=1 scripts/flash.sh            # erase the whole flash first (wipes assets/NVS)
 #   BENCH=1 scripts/flash.sh            # light-sleep soak build (sdkconfig.defaults + sdkconfig.bench, in
 #                                       # build-bench/ with its own sdkconfig), then run scripts/sleep_soak.sh
+#   LCDRACE=1 scripts/flash.sh          # display bus stress build (sdkconfig.defaults + sdkconfig.lcdrace, in
+#                                       # build-lcdrace/): tiny flushes as fast as possible from the other core
 #   STRESS=1 scripts/flash.sh           # stress-session build (sdkconfig.defaults + sdkconfig.stress, in build-stress/):
 #                                       # session + water scene + 200 KB atlas every 30 s, /bench/crash + /bench/wedge
 #
@@ -55,6 +57,13 @@ if [ -n "${STRESS:-}" ]; then
     BUILD_LOG="$FW/build-stress.log"
     mkdir -p "$BUILD_DIR"
     echo "== STRESS build (session + water scene + atlas uploads, bench fault routes): NOT for the clip"
+elif [ -n "${LCDRACE:-}" ]; then
+    BUILD_DIR="$FW/build-lcdrace"
+    SDKCFG="$BUILD_DIR/sdkconfig"
+    DEFAULTS="$FW/sdkconfig.defaults;$FW/sdkconfig.lcdrace"
+    BUILD_LOG="$FW/build-lcdrace.log"
+    mkdir -p "$BUILD_DIR"
+    echo "== LCD RACE build (display bus hand-over stress): NOT for the clip"
 elif [ -n "${BENCH:-}" ]; then
     BUILD_DIR="$FW/build-bench"
     SDKCFG="$BUILD_DIR/sdkconfig"

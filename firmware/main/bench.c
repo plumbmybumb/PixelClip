@@ -294,6 +294,64 @@ static void stress_start(void)
 }
 #endif /* CONFIG_PIXELCLIP_BENCH_STRESS */
 
+#if CONFIG_PIXELCLIP_BENCH_LCD_RACE
+/* Display bus hand-over stress (CONFIG_PIXELCLIP_BENCH_LCD_RACE, README "Bench: display bus stress").
+ * The freeze of 2026-11-15: the player waited for ever in spi_device_acquire_bus() with every other task idle.
+ * This task asks for the bus right around the end of the previous colour transfer, tens of thousands of times
+ * a second, from the core the SPI interrupt is not on. */
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+#include "esp_timer.h"
+#include "esp_rom_sys.h"
+#include "display.h"
+
+static const char *LTAG = "lcdrace";
+
+extern volatile uint32_t g_display_bench_gap_us;   /* display.c, bench builds only */
+
+#define RACE_GAP_MAX_US 1700   /* one 24-row band takes about 1.3 ms on the wire at 40 MHz QSPI */
+
+static void lcd_race_task(void *arg)
+{
+    (void)arg;
+    vTaskDelay(pdMS_TO_TICKS(10000));   /* let the boot and the first playlist item settle */
+    ESP_LOGW(LTAG, "start: flushes from core %d", (int)xPortGetCoreID());
+    uint32_t n = 0, errs = 0, last_n = 0, sweeps = 0;
+    int64_t t_log = esp_timer_get_time();
+    for (;;) {
+        /* Two bands (24 rows + 2 rows, full width, the pixels the framebuffer already holds): the second
+         * band's request for the bus comes `gap` after the first band was queued, swept in 1 us steps across
+         * the whole transfer, so it keeps crossing the moment the transfer's interrupt finishes. */
+        const uint32_t gap = n % RACE_GAP_MAX_US;
+        display_lock();
+        g_display_bench_gap_us = gap ? gap : 1;
+        if (display_flush_rect(0, 0, DISPLAY_W, 26) != ESP_OK) errs++;
+        g_display_bench_gap_us = 0;
+        display_unlock();
+        /* and one tiny single-band flush right behind it, after a short swept pause */
+        esp_rom_delay_us(n % 48);
+        if (display_flush_rect((int)(n % 64) * 2, 0, 2 + 2 * (int)(n % 4), 2) != ESP_OK) errs++;
+        n++;
+        if (gap == RACE_GAP_MAX_US - 1) sweeps++;
+        if ((n & 0x3F) == 0) vTaskDelay(1);   /* the idle task of this core must run */
+        const int64_t now = esp_timer_get_time();
+        if (now - t_log >= 5000000) {
+            ESP_LOGW(LTAG, "%u rounds (%u in the last %d ms), %u sweeps, %u errors", (unsigned)n, (unsigned)(n - last_n),
+                     (int)((now - t_log) / 1000), (unsigned)sweeps, (unsigned)errs);
+            t_log = now;
+            last_n = n;
+        }
+    }
+}
+
+static void lcd_race_start(void)
+{
+    ESP_LOGW(LTAG, "LCD RACE BUILD: display bus hand-over stress from 10 s after boot; NOT for the clip");
+    if (xTaskCreatePinnedToCore(lcd_race_task, "lcdrace", 4096, NULL, 3, NULL, 1) != pdPASS) ESP_LOGE(LTAG, "no task");
+}
+#endif /* CONFIG_PIXELCLIP_BENCH_LCD_RACE */
+
 void bench_start(bench_post_fn_t post)
 {
 #if CONFIG_PIXELCLIP_BENCH_SLEEP_TEST || CONFIG_PIXELCLIP_BENCH_STRESS
@@ -306,5 +364,8 @@ void bench_start(bench_post_fn_t post)
 #endif
 #if CONFIG_PIXELCLIP_BENCH_STRESS
     stress_start();
+#endif
+#if CONFIG_PIXELCLIP_BENCH_LCD_RACE
+    lcd_race_start();
 #endif
 }

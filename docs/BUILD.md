@@ -3,6 +3,13 @@
 From an empty bench to a clip in your hair. Parts and tools are in [`PARTS.md`](PARTS.md); board facts are in
 [`HARDWARE.md`](HARDWARE.md) and [`MECHANICAL.md`](MECHANICAL.md).
 
+> [!CAUTION]
+> **No warranty. You build, charge and wear this at your own risk.** PixelClip is a hobby project shared as is,
+> not a product, and nobody has certified it. It puts a lithium cell, a modified charger and a radio on your
+> head. A clip built from this guide may not work, may stop working, or may overheat or catch fire, and the
+> guide itself may be wrong or incomplete. The authors and contributors accept no liability for any injury,
+> fire, damage or loss that follows. The full notice is in the root [`README.md`](../README.md#no-warranty).
+
 ## What has and has not been tested
 
 Be clear about this before you start. "Reference build" below means the clip built while the project was
@@ -12,11 +19,35 @@ developed.
 sensor's axis mapping; printing this case in PETG, fitting the board and cell, and keys that click the board's
 switches with the lid on.
 
+**This repository's firmware and app on a clip (November 2026).** The firmware was flashed to an erased board
+and the release app installed on an iPhone. The boot checks of `firmware/scripts/flash.sh` pass. Starter animations,
+a 3.8 MB video, live scenes, the Tarot and playlists were sent from the phone, over Bluetooth and over the
+clip's WiFi hotspot, mostly with the clip plugged into USB. What that first use found:
+
+- **A freeze, fixed.** The picture stopped and the clip restarted itself about a minute later (its watchdog;
+  the content is kept). It was caught once after 5.8 hours of plain playback, traced to the display driver
+  asking for the SPI bus at the wrong moment, reproduced within seconds by a stress build and fixed. The same
+  stress then ran 12 minutes without a freeze. An earlier freeze with the same symptom, during a video upload,
+  was not recorded in enough detail to say it was the same fault. See
+  [`../firmware/README.md`](../firmware/README.md), "Bench: display bus stress".
+- **One crash, not explained.** Once, 458 s after power-on, the firmware stopped with an interrupt watchdog
+  panic and restarted. It has not happened again and its cause is not known. Long everyday runs on the fixed
+  firmware are still to come, so expect that a clip may restart by itself now and then.
+- **Turning the playlist on sometimes did nothing for up to a minute.** Fixed in the app.
+- **Every playlist send uploaded the Tarot's fonts again.** Fixed in the app: turning a playlist with the Tarot
+  on now takes about 0.9 s over Bluetooth, where it took about 2.5 s.
+- A full redraw of the screen takes 15.4 ms.
+
 **Not done or not measured:**
 
 - **The charge-resistor change.** It is computed from a datasheet formula for related chargers. The project's
   records do not show it being done, and the charge current was never measured.
-- A full day of wear on battery with the final firmware. Runtime figures are estimates.
+- A full day of wear on battery with the final firmware. Runtime figures are estimates. The first use
+  described above was mostly on USB power.
+- **The button press for a firmware update and the password-reset gesture** (step 20). Both are built and
+  tested against the simulator and the offline mock; neither has been tried on a real clip.
+- **How the first password setup looks on the phone** (step 20). Sends over WiFi kept working on the clip, but
+  the note and the extra "Join" prompt were not written down.
 - How the hair clip is fixed to this version of the case (step 17).
 - Drop strength. An earlier print with fewer walls cracked near a key after a few drops from head height; the
   stronger print settings in [`../case/README.md`](../case/README.md) are the response, and they have not been
@@ -306,11 +337,12 @@ saved network is installed again with the new password.
 - If it is ever lost: press BOOT five times quickly, then hold it while the clip shows "Reset WiFi password?".
   The clip goes back to the default password and keeps its content.
 
-**Not yet tried on a real clip and phone:** this password setup, the reset gesture and the button press for
-firmware updates were built and tested against the simulator and the offline mock only. If the app cannot join
-after the change, the reset gesture, or `ERASE=1 firmware/scripts/flash.sh` over USB (which wipes the clip's
-content), gets you back to the default. See the root [`README.md`](../README.md), "Things to know before you
-wear it".
+**How far this has been tried on a real clip and phone:** sends over WiFi kept working on the first clip
+across many sessions, but what the phone showed at the first setup was not written down, and the reset gesture
+and the button press for firmware updates have not been tried on a real clip at all; they were tested against
+the simulator and the offline mock. If the app cannot join after the change, the reset gesture, or
+`ERASE=1 firmware/scripts/flash.sh` over USB (which wipes the clip's content), gets you back to the default.
+See the root [`README.md`](../README.md), "Things to know before you wear it".
 
 ### 21. Check the motion sensor
 
@@ -349,6 +381,9 @@ months (an estimate). For long storage, open the case and unplug the cell.
 
 ## Safety
 
+Nothing here is a guarantee: this is a hobby build with no warranty, made and worn at your own risk (see the
+notice at the top of this guide and in the root [`README.md`](../README.md#no-warranty)).
+
 A LiPo cell worn on the head needs care, and parts of this build were never measured (see "What has and has not
 been tested"), including the charge current after the R1 change. At the least:
 
@@ -377,3 +412,4 @@ been tested"), including the charge current after the R1 change. At the least:
 | The lid leaves a gap over the board | Something under the board is holding it up: the cell, extra tape, or leftover header pins (see "Choosing substitutes" in [`PARTS.md`](PARTS.md)). |
 | The clip restarts during WiFi on battery | A bulk capacitor at the battery input is the documented fix ([`HARDWARE.md`](HARDWARE.md) §7); the case has no room reserved for it. |
 | Sand falls sideways | Step 21. |
+| The picture freezes, then the clip restarts by itself | Build and flash the current firmware: a freeze of this kind was fixed in November 2026 (see "What has and has not been tested"). The clip's watchdog restarts it within about a minute and the content is kept. If it still happens, record the console while it does (`firmware/scripts/serial_capture.py '/dev/cu.usbmodem*' 3600 clip.log` in a shell where ESP-IDF's `export.sh` is loaded; unplug the cell first if R1 is unchanged) and open an issue with the log. |

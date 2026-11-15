@@ -150,10 +150,16 @@ an ordinary send:
 
 **How these were checked.** A clean firmware build, host tests of the permission and gesture logic, the
 end-to-end script against the offline mock, and the app's unit, simulator and UI tests against its built-in
-virtual clip. **None of it has run on a real clip or a real phone.** Not known until it does: how the prompts
-look on the panel, whether the presses are comfortable, how iOS behaves when the saved network is installed
-again with the new password (the code removes the saved network and adds it again, which should cost one extra
-"Join" prompt), and the Keychain on a device.
+virtual clip. At the time of the review **none of it had run on a real clip or a real phone.**
+
+**Since then (November 2026):** this firmware and app were used on one clip with one iPhone. Sends over WiFi
+kept working across many sessions, so the private password did not lock the phone out. What the phone showed
+at the first setup was not written down. The button press for a firmware update and the reset gesture have
+still not been tried on a real clip. Still not known: how the prompts look on the panel, whether the presses
+are comfortable, and exactly how iOS behaves when the saved network is installed again with the new password
+(the code removes the saved network and adds it again, which should cost one extra "Join" prompt). That first
+use also found two reliability faults that are not security findings; they are recorded in
+[`BUILD.md`](BUILD.md#what-has-and-has-not-been-tested).
 
 **What these do not change.** A stranger who has not got the password can still do everything listed as Open
 under Bluetooth. Someone who holds the clip can reset its password and allow an update; physical access was

@@ -32,7 +32,8 @@ cell (about 5.5 hours by the project's estimate, not yet measured), and needs no
 your hair. No hardware yet? The app runs in the iOS simulator against a built-in virtual clip, so you can try
 everything first.
 
-**Before you start**, read [what has and has not been tested](docs/BUILD.md#what-has-and-has-not-been-tested).
+**Before you start**, read the [no-warranty notice](#no-warranty) and
+[what has and has not been tested](docs/BUILD.md#what-has-and-has-not-been-tested).
 This is a hobby project documented from one working clip. In particular, the board's charger must be slowed down
 with a resistor change before it charges a cell this small, and that change is computed, not measured.
 
@@ -144,6 +145,32 @@ DEVICE_ID=<id> ./build.sh device             # build, install and launch on it
 
 Joining the clip's hotspot from the app uses the Hotspot Configuration entitlement, which needs a paid Apple
 Developer membership. More detail: "Bundle id and signing" in [`ios/README.md`](ios/README.md).
+
+<a id="no-warranty"></a>
+
+## No warranty: build and wear it at your own risk
+
+PixelClip is a hobby project, shared as is so that people can build their own. It is not a product, nobody has
+tested it to any safety standard, and parts of it were never measured
+([what has and has not been tested](docs/BUILD.md#what-has-and-has-not-been-tested)).
+
+Building one means soldering on a small board, changing its battery charger, and wearing a lithium polymer
+cell and a radio on your head. Lithium cells can overheat, burst or catch fire if they are overcharged,
+shorted, crushed, pierced or connected the wrong way round.
+
+If you build, modify, charge or wear a clip, you do it entirely at your own risk. As far as the law allows:
+
+- **No warranty of any kind.** Nothing here promises that the instructions are correct or complete, that a
+  clip built from them will work, keep working or be safe, or that it suits any purpose.
+- **No liability.** The authors and contributors are not liable for any injury, fire, damage to property, loss
+  of data or other loss arising from this project or from anything built with it, whatever the cause,
+  including mistakes or gaps in these files.
+- **Rules where you live are yours to check**: battery, electrical and radio rules, and whether you may carry
+  or post a lithium cell.
+
+This applies to everything in the repository: firmware, app, case files, parts list and guides. The
+[MIT licence](LICENSE) says the same for the software in its own words. If you are not comfortable with
+that, do not build one.
 
 ## Things to know before you wear it
 

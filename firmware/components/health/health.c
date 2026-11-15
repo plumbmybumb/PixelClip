@@ -13,6 +13,7 @@
 #include "esp_timer.h"
 #include "esp_system.h"
 #include "esp_rom_sys.h"
+#include "esp_debug_helpers.h"
 #include "esp_heap_caps.h"
 #include "nvs.h"
 #include "hal/wdt_hal.h"
@@ -311,6 +312,14 @@ void health_feed(void)
             }
             ESP_LOGE(TAG, "liveness: silent: %s: NOT feeding the RTC watchdog (reset within %d s)", who,
                      CONFIG_PIXELCLIP_RTC_WDT_TIMEOUT_S);
+            /* Once per boot: where every task is, while the silent one is still stuck there. A liveness reset
+             * leaves no core dump (the RTC watchdog resets the chip), so this is the only record of the place. */
+            static bool s_dumped;
+            if (!s_dumped) {
+                s_dumped = true;
+                ESP_LOGE(TAG, "liveness: backtraces of all tasks follow");
+                esp_backtrace_print_all_tasks(24);
+            }
         }
         return;
     }

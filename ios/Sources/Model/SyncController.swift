@@ -77,6 +77,11 @@ final class SyncController {
     /// What went wrong, in words a person can act on (nil while things go well).
     private(set) var problem: SendProblem?
     private(set) var report: SyncReport?
+    /// Step the clip to the next rotation entry once the playlist is on it (the playlist was just switched on:
+    /// what was on screen is its first entry, and would start its minute over). Sent while the link this send used
+    /// is still open: after the sheet closes, the Wi‑Fi session ends in the background, and a step sent then races
+    /// that end and can arrive after the clip has turned its Wi‑Fi off.
+    var stepAfterPlaylist = false
     /// The "Waking … over Bluetooth" row is part of this send (Settings ▸ Bluetooth Wake).
     private(set) var wakesOverBluetooth: Bool
     /// The clip's screen keeps playing during the session (else it rests until the session ends).
@@ -326,6 +331,21 @@ final class SyncController {
         #endif
     }
 
+    /// `POST /next` on the link this send is using, tried twice. A miss is harmless (the rotation moves on by
+    /// itself within the minute), so it is only logged.
+    private func stepToNext(session: ClipSession) async {
+        for attempt in 1...2 {
+            do {
+                try await session.client.next()
+                sendLog("send: playlist on · the clip stepped to the next entry")
+                return
+            } catch {
+                sendLog("send: playlist on · couldn’t step the clip (", peer: error.localizedDescription,
+                        then: attempt == 1 ? "); trying once more" : "); it moves on by itself")
+            }
+        }
+    }
+
     /// The person's wait is over: the sheet closes (`closeRequested`) and the session ends in the
     /// background (errors there are silent: the clip times out anyway).
     private func closeAndEndInBackground(session: ClipSession, refreshTexts: Bool) {
@@ -443,6 +463,7 @@ final class SyncController {
             fail(.playlist, f.map { SendProblem(failure: $0, batteryWasLow: wasLow) } ?? .playlistRejected)
         }
         if report.succeeded {
+            if stepAfterPlaylist, !report.playlistSkipped { await stepToNext(session: session) }
             // The last upload went through: close the sheet, end the session in the background.
             ClipDocument.markSent(library: library, deviceID: session.status?.device.id)
             if let doc = readerDoc {

@@ -177,19 +177,11 @@ final class Sender {
         isSending = true
         lastKind = kind
         let started = Date()
-        let outcome = await attempt(job)
+        // A playlist that was just switched on steps the clip to its next entry as part of the send itself
+        // (`SyncController.stepAfterPlaylist`), before the Wi‑Fi session is ended in the background.
         let step = stepAfterSend && job == .playlist
         stepAfterSend = false
-        if step, case .sent = outcome {
-            // Over the fast lane when the Wi‑Fi session has closed, else HTTP. A miss here is harmless
-            // (the rotation moves on by itself within the minute), so it's only logged.
-            do {
-                try await session.client.next()
-                sendLog("sender: playlist on · the clip stepped to the next entry")
-            } catch {
-                sendLog("sender: playlist on · couldn’t step the clip (", peer: error.localizedDescription, then: "); it moves on by itself")
-            }
-        }
+        let outcome = await attempt(job, step: step)
         isSending = false
         let took = String(format: "%.1f", Date().timeIntervalSince(started))
         switch outcome {
@@ -232,10 +224,11 @@ final class Sender {
 
     private enum Outcome { case sent, away, problem(SendProblem) }
 
-    private func attempt(_ job: Job) async -> Outcome {
+    private func attempt(_ job: Job, step: Bool = false) async -> Outcome {
         switch job {
         case .playlist:
             let c = SyncController(request: .playlist)
+            c.stepAfterPlaylist = step
             controller = c
             defer { controller = nil }
             await c.run(session: session, library: library)

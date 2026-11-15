@@ -584,8 +584,14 @@ final class OracleReaderTests: XCTestCase {
         XCTAssertEqual(Set(r.result.uploadedAtlases), Set(fonts.flatMap { $0.atlases.map(\.id) }))
         try await clip.putPlaylist(r.playlist)
 
-        // Again: nothing new.
+        // Again: nothing new, and nothing sent or read twice. The fonts the clip lists are not PUT again (a PUT
+        // rewrites the document on the clip and restarts the Tarot), and each list is read once.
+        let before = await clip.requestLog.count
         let again = try await pusher.prepareOracleReaders(playlist, texts: [text], fonts: fonts, keep: playlist)
+        let sent = Array(await clip.requestLog.dropFirst(before))
+        XCTAssertEqual(again.result.fontsPut, [])
+        XCTAssertEqual(again.result.fontsUnchanged, [Self.atlasFonts.body.id, Self.atlasFonts.big.id])
+        XCTAssertEqual(sent, ["GET /assets", "GET /fonts", "GET /texts"])
         XCTAssertEqual(again.result.textsPut, [])
         XCTAssertEqual(again.result.uploadedAtlases, [])
         XCTAssertEqual(again.deletedTexts, [])
@@ -643,4 +649,54 @@ final class OracleReaderTests: XCTestCase {
         XCTAssertNil(pl.withoutUnavailableOracles(missingTexts: [], missingFonts: [o.fontBig!]).items.first?.fontBig)
         XCTAssertEqual(pl.withoutUnavailableOracles(missingTexts: [], missingFonts: []), pl)
     }
+
+    // MARK: Fonts already on the clip
+
+    /// A font is sent again when the clip lists it with another summary, when the clip cannot list its fonts, and
+    /// when one of its atlases was just replaced; otherwise it is left alone.
+    func testFontsAreSentOnlyWhenTheClipLacksThem() async throws {
+        let fonts = [Self.atlasFonts.body, Self.atlasFonts.big]
+        let o = TarotTests.item
+        let text = ReaderPusher.Text(id: o.id, data: TarotTests.bundleData, title: "Tarot")
+
+        // The list entry is the document's summary, in the clip's own key names.
+        let info = ClipFontInfo(id: fonts[0].id, document: fonts[0].document)
+        XCTAssertTrue(info.matches(fonts[0].document))
+        let json = try JSONSerialization.jsonObject(with: ClipJSON.encoder().encode(info)) as? [String: Any]
+        XCTAssertEqual(Set(json?.keys.map { $0 } ?? []), ["id", "glyphs", "cell_w", "cell_h", "compact", "large"])
+        // An entry without the summary (the clip could not parse its copy), or with another one, does not match.
+        XCTAssertFalse(ClipFontInfo(id: fonts[0].id).matches(fonts[0].document))
+        var other = info
+        other.glyphs = (info.glyphs ?? 0) + 1
+        XCTAssertFalse(other.matches(fonts[0].document))
+        let decoded = try ClipJSON.decoder().decode(FontList.self, from: Data(#"{"ok":true,"fonts":[{"id":"f1"},{"id":"f2","glyphs":3,"cell_w":4,"cell_h":5,"compact":true,"large":false}]}"#.utf8))
+        XCTAssertEqual(decoded.fonts, [ClipFontInfo(id: "f1"), ClipFontInfo(id: "f2", glyphs: 3, cellW: 4, cellH: 5, compact: true, large: false)])
+
+        // A clip that holds both fonts: the second call sends neither.
+        let clip = VirtualClipClient(options: .instant)
+        let first = try await ReaderPusher(client: clip).ensure(texts: [text], fonts: fonts)
+        XCTAssertEqual(first.fontsPut, fonts.map(\.id))
+        XCTAssertEqual(first.fontsUnchanged, [])
+        let second = try await ReaderPusher(client: clip).ensure(texts: [text], fonts: fonts)
+        XCTAssertEqual(second.fontsPut, [])
+        XCTAssertEqual(second.fontsUnchanged, fonts.map(\.id))
+        let listed = try await clip.fonts()
+        XCTAssertEqual(listed.map(\.id), fonts.map(\.id).sorted())
+
+        // A client that cannot list fonts (the forwarding test client leaves `fonts()` at the protocol's default,
+        // which answers like a clip without the route): both are sent, as before.
+        let blind = CountingClipClient(clip)
+        let third = try await ReaderPusher(client: blind).ensure(texts: [text], fonts: fonts)
+        XCTAssertEqual(third.fontsPut, fonts.map(\.id))
+        XCTAssertEqual(third.fontsUnchanged, [])
+
+        // One of the body font's atlases is replaced on the clip: that font is sent again, the other is not.
+        let atlas = fonts[0].atlases[0]
+        try await clip.deleteAsset(id: atlas.id)
+        let fourth = try await ReaderPusher(client: clip).ensure(texts: [text], fonts: fonts)
+        XCTAssertEqual(fourth.uploadedAtlases, [atlas.id])
+        XCTAssertEqual(fourth.fontsPut, [fonts[0].id])
+        XCTAssertEqual(fourth.fontsUnchanged, [fonts[1].id])
+    }
 }
+

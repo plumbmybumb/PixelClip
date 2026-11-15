@@ -39,6 +39,44 @@ public struct TextList: Codable, Sendable, Equatable {
     public init(ok: Bool = true, texts: [ClipText]) { self.ok = ok; self.texts = texts }
 }
 
+/// One entry of `GET /fonts`: a font's id and a summary of its document.
+public struct ClipFontInfo: Codable, Sendable, Equatable {
+    public var id: String
+    public var glyphs: Int?
+    public var cellW: Int?
+    public var cellH: Int?
+    public var compact: Bool?
+    public var large: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case id, glyphs, compact, large
+        case cellW = "cell_w"
+        case cellH = "cell_h"
+    }
+
+    public init(id: String, glyphs: Int? = nil, cellW: Int? = nil, cellH: Int? = nil, compact: Bool? = nil, large: Bool? = nil) {
+        self.id = id; self.glyphs = glyphs; self.cellW = cellW; self.cellH = cellH; self.compact = compact; self.large = large
+    }
+
+    /// The entry the clip lists for `document` stored under `id`.
+    public init(id: String, document d: ReaderFontDocument) {
+        self.init(id: id, glyphs: d.normal.glyphs.unicodeScalars.count, cellW: d.normal.cellW, cellH: d.normal.cellH,
+                  compact: d.compact != nil, large: d.large != nil)
+    }
+
+    /// The clip's font is `document` as far as the list tells: the same glyph count, cell size and faces. An entry
+    /// without the summary (a document the clip could not parse) never matches, so that font is sent again.
+    public func matches(_ document: ReaderFontDocument) -> Bool {
+        self == ClipFontInfo(id: id, document: document)
+    }
+}
+
+public struct FontList: Codable, Sendable, Equatable {
+    public var ok: Bool
+    public var fonts: [ClipFontInfo]
+    public init(ok: Bool = true, fonts: [ClipFontInfo]) { self.ok = ok; self.fonts = fonts }
+}
+
 /// The reader font document (`PUT /fonts/{id}`):
 /// `{"glyphs":"ABC…","advance":[…],"cell_w":64,"cell_h":120,"baseline":92,"atlas_white":"…","atlas_accent":"…","compact":{…same keys…}}`.
 /// Glyph `i` of both atlases is the i-th code point of `glyphs`; it is drawn with its pen origin at

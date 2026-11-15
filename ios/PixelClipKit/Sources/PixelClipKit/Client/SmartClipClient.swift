@@ -124,6 +124,7 @@ public final class SmartClipClient: ClipClient {
     }
 
     public func deleteText(id: String) async throws { try await route("DELETE", "/texts/\(id)") { try await $0.deleteText(id: id) } }
+    public func fonts() async throws -> [ClipFontInfo] { try await route("GET", "/fonts") { try await $0.fonts() } }
     public func putFont(id: String, _ font: ReaderFontDocument) async throws { try await route("PUT", "/fonts/\(id)") { try await $0.putFont(id: id, font) } }
     public func font(id: String) async throws -> ReaderFontDocument { try await route("GET", "/fonts/\(id)") { try await $0.font(id: id) } }
     public func reader() async throws -> ReaderStatus { try await route("GET", "/reader") { try await $0.reader() } }

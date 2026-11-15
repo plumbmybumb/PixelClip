@@ -91,6 +91,11 @@ public final class FastLaneClipClient: ClipClient {
         let _: OKResponse = try await json("DELETE", "/texts/\(id)")
     }
 
+    public func fonts() async throws -> [ClipFontInfo] {
+        let list: FontList = try await json("GET", "/fonts")
+        return list.fonts
+    }
+
     public func putFont(id: String, _ font: ReaderFontDocument) async throws {
         guard HCA.isValidAssetID(id) else { throw ClipError.invalidAssetID(id) }
         let _: OKResponse = try await json("PUT", "/fonts/\(id)", body: font)

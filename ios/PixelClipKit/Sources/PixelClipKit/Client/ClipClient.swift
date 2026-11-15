@@ -42,6 +42,8 @@ public protocol ClipClient: Sendable {
     /// `PUT /texts/{id}` (UTF-8, ≤ 1 MB, `X-Content-SHA256`); a 409 (identical text present) is `.alreadyPresent`.
     func putText(id: String, data: Data) async throws -> AssetPutResult
     func deleteText(id: String) async throws
+    /// `GET /fonts`: the fonts on the clip, each with a summary of its document.
+    func fonts() async throws -> [ClipFontInfo]
     /// `PUT /fonts/{id}`: the font document (its atlases must be on the clip first).
     func putFont(id: String, _ font: ReaderFontDocument) async throws
     /// `GET /fonts/{id}`.
@@ -134,6 +136,9 @@ public extension ClipClient {
     /// Clients without the update gate answer like firmware that predates it.
     func otaState() async throws -> OTAState { throw ClipError.http(status: 404, envelope: ErrorEnvelope(error: "not_found", message: "No route /ota.")) }
     func askOTA() async throws -> OTAState { throw ClipError.http(status: 404, envelope: ErrorEnvelope(error: "not_found", message: "No route /ota/ask.")) }
+
+    /// Clients that cannot list fonts answer like a clip without the route: every font is then sent.
+    func fonts() async throws -> [ClipFontInfo] { throw ClipError.http(status: 404, envelope: ErrorEnvelope(error: "not_found", message: "No route /fonts.")) }
 }
 
 public extension ClipStatus {

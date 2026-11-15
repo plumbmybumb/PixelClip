@@ -1,7 +1,7 @@
 import Foundation
 
 /// Puts reader content on the clip in the order the firmware needs: font atlases (if missing) →
-/// `PUT /fonts/{id}` → `PUT /texts/{id}` (if missing) → the composed playlist (same `SyncEngine`
+/// `PUT /fonts/{id}` (if the clip doesn't list that font) → `PUT /texts/{id}` (if missing) → the composed playlist (same `SyncEngine`
 /// path as every other send, so the library's pictures and Tonight's moments stay) → clean-up of
 /// reader atlases nothing uses any more. A reader item whose text or font couldn't be stored is
 /// left out of the playlist rather than failing the whole send (the clip would answer 422).
@@ -25,6 +25,8 @@ public struct ReaderPusher: Sendable {
     public struct Result: Sendable, Equatable {
         public var uploadedAtlases: [String] = []
         public var fontsPut: [String] = []
+        /// Fonts the clip already had (the same id and document summary): not sent again.
+        public var fontsUnchanged: [String] = []
         public var textsPut: [String] = []
         public var textsUnchanged: [String] = []
         /// Content the clip refused (413 full, 422 rejected): reader items using it were left out.
@@ -44,6 +46,13 @@ public struct ReaderPusher: Sendable {
 
     /// Make sure the clip holds these fonts and texts. Throws only when the clip stops answering.
     public func ensure(texts: [Text], fonts: [ReaderFont], progress: @escaping @Sendable (Step) -> Void = { _ in }) async throws -> Result {
+        try await ensureListing(texts: texts, fonts: fonts, progress: progress).result
+    }
+
+    /// `ensure`, plus the clip's asset and text lists as read before anything was sent (for a clean-up after it,
+    /// which then needs no second read).
+    func ensureListing(texts: [Text], fonts: [ReaderFont],
+                       progress: @escaping @Sendable (Step) -> Void = { _ in }) async throws -> (result: Result, assets: [ClipAsset], texts: [ClipText]) {
         var result = Result()
         progress(.reading)
         let remote = try await client.assets()
@@ -65,9 +74,26 @@ public struct ReaderPusher: Sendable {
                 result.firstClipError = result.firstClipError ?? (error as? ClipError)
             }
         }
+        // Fonts the clip already holds are not sent again: a font's id is a hash of what it was rendered from, and
+        // every `PUT /fonts` rewrites the document on the clip and restarts the item drawn with it. A font is sent
+        // when the clip does not list it, lists it with another summary, or one of its atlases was just replaced;
+        // and always when the clip cannot list its fonts.
+        var onClip: [String: ClipFontInfo] = [:]
+        if !fonts.isEmpty {
+            do {
+                onClip = Dictionary(try await client.fonts().map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            } catch {
+                if (error as? ClipError)?.isUnreachable == true || error is URLError { throw error }
+            }
+        }
+        let replaced = Set(result.uploadedAtlases)
         for f in fonts {
             progress(.font)
             guard f.document.atlasIDs.allSatisfy({ !failedAtlases.contains($0) }) else { result.failedFonts.append(f.id); continue }
+            if onClip[f.id]?.matches(f.document) == true, f.document.atlasIDs.allSatisfy({ !replaced.contains($0) }) {
+                result.fontsUnchanged.append(f.id)
+                continue
+            }
             do {
                 try await client.putFont(id: f.id, f.document)
                 result.fontsPut.append(f.id)
@@ -96,7 +122,7 @@ public struct ReaderPusher: Sendable {
                 result.firstClipError = result.firstClipError ?? (error as? ClipError)
             }
         }
-        return result
+        return (result, remote, remoteTexts)
     }
 
     /// Reader items whose text or font isn't available are dropped.
@@ -176,8 +202,14 @@ extension ReaderPusher {
         let wantedTexts = Set(playlist.oracleReaderIDs), wantedFonts = Set(playlist.oracleFontIDs)
         let texts = texts.filter { wantedTexts.contains($0.id) }, fonts = fonts.filter { wantedFonts.contains($0.id) }
         var result = Result()
+        // The clip's lists as `ensureListing` read them: the clean-up below works from those (what this call adds
+        // is wanted, so it is never a candidate), instead of reading both lists a second time.
+        var listedAssets: [ClipAsset]?, listedTexts: [ClipText]?
         if !wantedTexts.isEmpty {
-            result = try await ensure(texts: texts, fonts: fonts, progress: progress)
+            let e = try await ensureListing(texts: texts, fonts: fonts, progress: progress)
+            result = e.result
+            listedAssets = e.assets
+            listedTexts = e.texts
         }
         let missingTexts = wantedTexts.subtracting(texts.map(\.id)).union(result.failedTexts)
         let missingFonts = wantedFonts.subtracting(fonts.map(\.id)).union(result.failedFonts)
@@ -186,11 +218,15 @@ extension ReaderPusher {
         if let keep {
             func unreachable(_ e: any Error) -> Bool { (e as? ClipError)?.isUnreachable == true || e is URLError }
             let keepTexts = Set(keep.oracleReaderIDs).union(out.oracleReaderIDs)
-            for t in (try? await client.texts()) ?? [] where t.id.hasPrefix(ReaderBundle.textPrefix) && !keepTexts.contains(t.id) {
+            let clipTexts: [ClipText]
+            if let listedTexts { clipTexts = listedTexts } else { clipTexts = (try? await client.texts()) ?? [] }
+            for t in clipTexts where t.id.hasPrefix(ReaderBundle.textPrefix) && !keepTexts.contains(t.id) {
                 do { try await client.deleteText(id: t.id); deletedTexts.append(t.id) } catch { if unreachable(error) { throw error } }
             }
             let keepFonts = Set((keep.oracleFontIDs + out.oracleFontIDs).compactMap(TarotFonts.fontKey(inID:)))
-            for a in (try? await client.assets()) ?? [] {
+            let clipAssets: [ClipAsset]
+            if let listedAssets { clipAssets = listedAssets } else { clipAssets = (try? await client.assets()) ?? [] }
+            for a in clipAssets {
                 guard let key = TarotFonts.fontKey(inID: a.id), !keepFonts.contains(key) else { continue }
                 do { try await client.deleteAsset(id: a.id); deletedAtlases.append(a.id) } catch { if unreachable(error) { throw error } }
             }

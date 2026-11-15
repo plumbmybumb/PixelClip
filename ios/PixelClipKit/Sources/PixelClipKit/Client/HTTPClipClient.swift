@@ -211,6 +211,11 @@ public final class HTTPClipClient: ClipClient {
         let _: OKResponse = try await json(.delete, "/texts/\(id)")
     }
 
+    public func fonts() async throws -> [ClipFontInfo] {
+        let list: FontList = try await json(.get, "/fonts")
+        return list.fonts
+    }
+
     public func putFont(id: String, _ font: ReaderFontDocument) async throws {
         guard HCA.isValidAssetID(id) else { throw ClipError.invalidAssetID(id) }
         let _: OKResponse = try await json(.put, "/fonts/\(id)", body: font)

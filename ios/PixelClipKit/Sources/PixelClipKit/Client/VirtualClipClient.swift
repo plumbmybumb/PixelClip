@@ -724,6 +724,11 @@ public actor VirtualClipClient: ClipClient {
         boundFonts[id] = nil
     }
 
+    public func fonts() async throws -> [ClipFontInfo] {
+        try await enter("GET /fonts")
+        return storedFonts.map { ClipFontInfo(id: $0.key, document: $0.value) }.sorted { $0.id < $1.id }
+    }
+
     public func font(id: String) async throws -> ReaderFontDocument {
         try await enter("GET /fonts/\(id)")
         guard let f = storedFonts[id] else { throw err(404, "not_found", "No font “\(id)”.") }

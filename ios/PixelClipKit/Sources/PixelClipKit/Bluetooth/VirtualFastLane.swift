@@ -221,6 +221,7 @@ public final class VirtualFastLane: FastLaneLink {
         case ("GET", "texts", 1): return try ok(TextList(texts: await clip.texts()))
         case ("DELETE", "texts", 2): try await clip.deleteText(id: parts[1]); return done
         case ("PUT", "fonts", 2): try await clip.putFont(id: parts[1], body(ReaderFontDocument.self)); return done
+        case ("GET", "fonts", 1): return try ok(FontList(fonts: await clip.fonts()))
         case ("GET", "fonts", 2): return try ok(await clip.font(id: parts[1]))
         case ("GET", "reader", 1): return try ok(await clip.reader())
         case ("POST", "reader", 1): try await clip.readerControl(body(ReaderCommand.self)); return done

@@ -9,6 +9,8 @@ import PixelClipKit
 @MainActor @Observable
 final class ClipSession {
     private(set) var client: any ClipClient
+    /// The clip's HTTP client (never the fast lane): the requests that must go over its Wi‑Fi.
+    @ObservationIgnored private var http: any ClipClient
     /// Wi‑Fi state, the fast lane and the hotspot path, for `client`'s routing.
     private(set) var links: ClipLinkBroker
     private(set) var joiner: HotspotJoiner
@@ -25,13 +27,19 @@ final class ClipSession {
         }
     }
 
-    /// Stored on the phone; used to join `PixelClip-XXXX`. Must match the clip's `ap_password`.
-    var hotspotPassword: String {
-        didSet {
-            UserDefaults.standard.set(hotspotPassword, forKey: Keys.password)
-            joiner.passphrase = hotspotPassword
-        }
-    }
+    /// The real clip's hotspot passphrase, in the Keychain (`HotspotPasswords`): the factory one until the
+    /// first join over Wi‑Fi, then the clip's own, set by the app without asking anything.
+    let realPasswords = HotspotPasswords(store: KeychainHotspotPasswordStore())
+    /// The virtual clip's, in memory (it starts from the factory passphrase at every launch, like the clip).
+    let virtualPasswords = HotspotPasswords(store: InMemoryHotspotPasswordStore())
+    /// The passphrases of the clip in use.
+    var passwords: HotspotPasswords { useVirtual ? virtualPasswords : realPasswords }
+    /// Home's one-time notice after the automatic setup (the real clip only).
+    private(set) var showsPasswordNotice = UserDefaults.standard.bool(forKey: Keys.passwordNotice)
+    /// The firmware update in Settings ▸ Advanced.
+    private(set) var firmwareStep: FirmwareStep = .idle
+    @ObservationIgnored private var firmwareTask: Task<Void, Never>?
+    @ObservationIgnored private var firmwareImage: Data?
 
     private(set) var status: ClipStatus?
     private(set) var config: ClipConfig?
@@ -61,7 +69,10 @@ final class ClipSession {
 
     enum Keys {
         static let virtual = "useVirtualClip"
+        /// Builds before the Keychain kept the passphrase here (migrated once, then removed).
         static let password = "hotspotPassword"
+        /// The automatic setup gave the clip its own passphrase and Home hasn't shown that yet.
+        static let passwordNotice = "hotspotPasswordNotice"
         /// `clockSyncedAt.<device id>`: this iPhone's last `POST /time` to that clip.
         static let clockSync = "clockSyncedAt."
         /// A remembered `PixelClip-…` network was installed (Settings ▸ Forget Clip removes it).
@@ -101,29 +112,34 @@ final class ClipSession {
         let v = false
         _ = defaultVirtual
         #endif
-        let pw = UserDefaults.standard.string(forKey: Keys.password) ?? HotspotDefaults.password
         useVirtual = v
-        hotspotPassword = pw
-        let (c, j, d) = Self.make(virtual: v, virtualClip: virtualClip, password: pw)
+        let (c, j, d) = Self.make(virtual: v, virtualClip: virtualClip)
         let broker = ClipLinkBroker(doorbell: d, joiner: j)
         links = broker
+        http = c
         client = SmartClipClient(http: c, links: broker)
         joiner = j
         doorbell = d
         joiner.bluetoothWake = AppSettings.shared.bluetoothWake
+        // The passphrase moves from UserDefaults to the Keychain once (a non-default one becomes the clip's own).
+        if realPasswords.migrate(legacy: UserDefaults.standard.string(forKey: Keys.password)) {
+            UserDefaults.standard.removeObject(forKey: Keys.password)
+        }
         wireLinks()
         // The virtual clip's motion sensor follows this iPhone's tilt when it has one (DeviceTilt).
         let clip = virtualClip
         Task { await clip.setGravitySource { DeviceTilt.shared.clipGravity } }
         // …and its Tarot is drawn by shaking this iPhone (while DeviceTilt runs: Home starts it when the Tarot is Now).
         Task { await clip.setShakeSource { DeviceTilt.shared.shakeMetric } }
+        // …and in the demo its button allows a firmware update by itself, a moment after the clip asks.
+        Task { await clip.setAutoPressForUpdate(after: .seconds(3)) }
     }
 
-    private static func make(virtual: Bool, virtualClip: VirtualClipClient, password: String) -> (any ClipClient, HotspotJoiner, any DoorbellRinging) {
+    private static func make(virtual: Bool, virtualClip: VirtualClipClient) -> (any ClipClient, HotspotJoiner, any DoorbellRinging) {
         if virtual {
             let probe: @Sendable () async -> Bool = { (try? await virtualClip.status()) != nil }
             let bell = VirtualDoorbell(clip: virtualClip)
-            return (virtualClip, HotspotJoiner(configurator: ImmediateHotspotConfigurator(), passphrase: password,
+            return (virtualClip, HotspotJoiner(configurator: VirtualHotspotConfigurator(clip: virtualClip),
                                                probeAttempts: 1, doorbell: bell, probe: probe), bell)
         }
         let http = HTTPClipClient()
@@ -136,14 +152,15 @@ final class ClipSession {
         #endif
         // CoreBluetooth on the simulator reports "unsupported": the doorbell then falls back to the button.
         let bell = PixelClipDoorbell(radio: CoreBluetoothRadio())
-        return (http, HotspotJoiner(configurator: configurator, passphrase: password, doorbell: bell, probe: probe), bell)
+        return (http, HotspotJoiner(configurator: configurator, doorbell: bell, probe: probe), bell)
     }
 
     private func rebuild() {
         doorbell.release()
-        let (c, j, d) = Self.make(virtual: useVirtual, virtualClip: virtualClip, password: hotspotPassword)
+        let (c, j, d) = Self.make(virtual: useVirtual, virtualClip: virtualClip)
         let broker = ClipLinkBroker(doorbell: d, joiner: j)
         links = broker
+        http = c
         client = SmartClipClient(http: c, links: broker)
         joiner = j
         doorbell = d
@@ -160,6 +177,12 @@ final class ClipSession {
 
     private func wireLinks() {
         links.onJoined = { [weak self] in self?.joinedWiFi() }
+        // Each connect asks which passphrase to join with (HotspotPasswords.plan), from what the clip last
+        // said about its own (`ap_password_set`, read with the config over Bluetooth or Wi‑Fi).
+        joiner.passwordPlan = { [weak self] in self?.hotspotPlan ?? .join([HotspotDefaults.password]) }
+        joiner.passphrase = passwords.effective
+        joiner.rememberedPassphrase = passwords.remembered
+        joiner.onRememberedChange = { [weak self] p in self?.passwords.setRemembered(p) }
         links.onRoute = { [weak self] r in
             self?.lastRoute = r
             let (kind, id) = AppLog.routeParts(r.route)
@@ -208,6 +231,8 @@ final class ClipSession {
     /// On the clip's Wi‑Fi: don't hold Bluetooth during the session.
     func joinedWiFi() {
         doorbell.release()
+        if passwords.didJoin(with: joiner.lastJoinPassphrase) { sendLog("hotspot: joined with the new Wi‑Fi password · kept") }
+        if let p = joiner.lastJoinPassphrase, p == passwords.current { setUpSessionOpenSince = nil }
         if joiner.lastJoinRemembered == true, !networkRemembered {
             networkRemembered = true
             UserDefaults.standard.set(true, forKey: Keys.remembered)
@@ -225,7 +250,7 @@ final class ClipSession {
             guard let self else { return }
             await self.refresh()
             if refreshTexts, let texts = try? await self.client.texts() { ReaderStore.shared.recordClipTexts(texts) }
-            try? await self.client.endSession()
+            if (try? await self.client.endSession()) != nil { self.setUpSessionOpenSince = nil }
             self.markSessionEnded()
             await self.updateVirtualScreen()
             self.endingTask = nil
@@ -263,6 +288,85 @@ final class ClipSession {
         imu = nil
     }
 
+    // MARK: Hotspot password
+
+    /// What the next join uses (see `HotspotPasswords.plan`), from the config last read. Right after the
+    /// automatic setup the clip's Wi‑Fi session that took the new passphrase still runs with the factory one
+    /// (a new passphrase applies from the next session): until that session is known to have ended (the app
+    /// ended it, a join with the new one went through, or its idle timeout has passed), the factory one is
+    /// tried first.
+    var hotspotPlan: HotspotPasswordPlan {
+        let plan = passwords.plan(clipReportsSet: config?.apPasswordSet)
+        if case .join(let list) = plan, let current = passwords.current, list == [current], let since = setUpSessionOpenSince {
+            let limit = config?.wifiAlwaysOn == true ? .infinity : TimeInterval((config?.uploadTimeoutS ?? 120) + 30)
+            if Date().timeIntervalSince(since) < limit { return .join([HotspotDefaults.password, current]) }
+        }
+        return plan
+    }
+
+    /// The setup's own Wi‑Fi session (still on the factory passphrase) may be running since then.
+    @ObservationIgnored private var setUpSessionOpenSince: Date?
+
+    /// The app ended the clip's Wi‑Fi session (the next one uses the clip's newest passphrase).
+    func clipEndedSession() {
+        setUpSessionOpenSince = nil
+        markSessionEnded()
+    }
+
+    /// The clip says its passphrase is the factory one again while this iPhone holds its own.
+    var clipPasswordWasReset: Bool { hotspotPlan == .blocked(.clipWasReset) }
+
+    /// The automatic first setup (on the clip's Wi‑Fi, after reading its config): a clip that still has the
+    /// factory passphrase, while this iPhone uses it too, gets a random one of its own, saved here first and
+    /// sent over HTTP (never the fast lane). It applies from the clip's next Wi‑Fi session. Nothing to do
+    /// for firmware that doesn't report `ap_password_set`, nor over a passphrase the person entered.
+    private func setUpHotspotPasswordIfNeeded() async {
+        guard isConnected, config?.apPasswordSet == false, passwords.current == nil, !passwords.isSettingUp else { return }
+        let http = http
+        var answer: ClipConfig?
+        let result = await passwords.setUpIfNeeded(clipReportsSet: false) { password in
+            answer = try await http.putConfig(ClipConfig(apPassword: password))
+        }
+        switch result {
+        case .done:
+            var cfg = answer ?? config ?? ClipConfig()
+            cfg.apPasswordSet = true
+            config = cfg
+            setUpSessionOpenSince = Date()
+            sendLog("hotspot: the clip has its own Wi‑Fi password now (from its next Wi‑Fi session), saved on this iPhone")
+            if !useVirtual {
+                showsPasswordNotice = true
+                UserDefaults.standard.set(true, forKey: Keys.passwordNotice)
+            }
+        case .storeFailed:
+            sendLog("hotspot: this iPhone couldn’t save a new Wi‑Fi password · the clip keeps its factory one")
+        case .clipFailed:
+            sendLog("hotspot: the clip didn’t confirm its new Wi‑Fi password · tried again at the next connection")
+        case .notNeeded:
+            break
+        }
+    }
+
+    /// "Set up again" (the clip's passphrase was reset on the clip): forget this iPhone's copy; the next join
+    /// uses the factory passphrase and the setup runs again.
+    func setUpHotspotPasswordAgain() {
+        passwords.clear()
+        sendLog("hotspot: set up again · joining with the factory Wi‑Fi password, then a new one")
+    }
+
+    /// Settings ▸ Advanced: a passphrase typed by the person (one another iPhone set). Why it can't be
+    /// used, or nil when saved.
+    func setHotspotPasswordManually(_ text: String) -> String? {
+        let problem = passwords.setManually(text)
+        if problem == nil { sendLog("hotspot: Wi‑Fi password \(passwords.current == nil ? "back to the factory one" : "entered in Settings")") }
+        return problem
+    }
+
+    func dismissPasswordNotice() {
+        showsPasswordNotice = false
+        UserDefaults.standard.set(false, forKey: Keys.passwordNotice)
+    }
+
     // MARK: Motion sensor
 
     /// `GET /imu` (connected only).
@@ -293,6 +397,7 @@ final class ClipSession {
             status = st
             let cfg = try await client.config()
             config = cfg
+            await setUpHotspotPasswordIfNeeded()
             clipPlaylist = try? await client.playlist()
             brightness = Double(cfg.brightness ?? 160)
             lastUpdated = Date()
@@ -312,8 +417,10 @@ final class ClipSession {
     func endSession() async {
         if await doorbell.endSession() {
             problem = nil
+            setUpSessionOpenSince = nil
         } else {
             await perform { try await $0.endSession() }
+            if problem == nil { setUpSessionOpenSince = nil }
         }
         joiner.markDisconnected()
         await updateVirtualScreen()
@@ -509,6 +616,7 @@ final class ClipSession {
     /// The Clip tab's End Session while not on the clip's Wi‑Fi: `POST /session/end` over the fast lane.
     func quickEndSession() async {
         await perform { try await $0.endSession() }
+        if problem == nil { setUpSessionOpenSince = nil }
         joiner.markDisconnected()
         await afterQuickAction()
     }
@@ -628,14 +736,82 @@ final class ClipSession {
         return result
     }
 
-    func updateFirmware(_ data: Data, progress: @escaping @Sendable (Double) -> Void) async -> Bool {
-        var ok = false
-        await perform { client in
-            try await client.ota(firmware: data, progress: progress)
-            ok = true
+    enum FirmwareStep: Equatable {
+        case idle
+        /// Waking the clip and asking it for the button press.
+        case asking
+        /// "Press the button on your clip", with the seconds left.
+        case waitingForPress(Int)
+        case uploading(Double)
+        case installed
+        /// The window ran out (or the upload asked for the press again and didn't get it).
+        case notPressed
+        case failed
+    }
+
+    /// Settings ▸ Advanced ▸ Update firmware: ask the clip, wait for its button, then upload
+    /// (`FirmwareUpdater`; older firmware takes the upload at once).
+    func startFirmwareUpdate(_ data: Data) {
+        guard firmwareTask == nil else { return }
+        firmwareImage = data
+        firmwareStep = .asking
+        sendLog("firmware: asking the clip for a press of its button")
+        firmwareTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.firmwareTask = nil }
+            let updater = FirmwareUpdater(client: self.client)
+            self.isWorking = true
+            defer { self.isWorking = false }
+            do {
+                try await updater.run(data) { [weak self] event in
+                    guard let self, self.firmwareTask != nil else { return }
+                    switch event {
+                    case .waitingForPress(let s): self.firmwareStep = .waitingForPress(s)
+                    case .uploading(let p): if self.firmwareStep != .installed { self.firmwareStep = .uploading(p) }
+                    }
+                }
+                self.firmwareStep = .installed
+                self.firmwareImage = nil
+                self.problem = nil
+                self.joiner.markDisconnected()   // the clip reboots
+                sendLog("firmware: sent · the clip restarts")
+            } catch FirmwareUpdater.Failure.notPressed {
+                self.firmwareStep = .notPressed
+                sendLog("firmware: the clip’s button wasn’t pressed in time")
+            } catch let e as ClipError where e.isPressButton {
+                self.firmwareStep = .notPressed
+                sendLog("firmware: the clip still wants its button pressed")
+            } catch is CancellationError {
+                self.firmwareStep = .idle
+                self.firmwareImage = nil
+                sendLog("firmware: cancelled")
+            } catch {
+                self.handle(error)
+                self.firmwareStep = .failed
+                self.firmwareImage = nil
+            }
         }
-        if ok { joiner.markDisconnected() }   // the clip reboots
-        return ok
+    }
+
+    /// The waiting screen's Cancel (the clip stops asking by itself when its window ends).
+    func cancelFirmwareUpdate() {
+        firmwareTask?.cancel()
+        firmwareTask = nil
+        firmwareStep = .idle
+        firmwareImage = nil
+    }
+
+    /// "Try again" after the window ran out: the same image.
+    func retryFirmwareUpdate() {
+        guard let data = firmwareImage else { firmwareStep = .idle; return }
+        startFirmwareUpdate(data)
+    }
+
+    /// Back to the button (after Installed, a failure, or Not pressed).
+    func resetFirmwareStep() {
+        guard firmwareTask == nil else { return }
+        firmwareStep = .idle
+        firmwareImage = nil
     }
 
     private func perform(_ body: (any ClipClient) async throws -> Void) async {
@@ -691,8 +867,16 @@ final class ClipSession {
         status = nil
         config = nil
         clipPlaylist = nil
+        virtualPasswords.clear()
+        virtualPasswords.setRemembered(nil)
         joiner.markDisconnected()
         await updateVirtualScreen()
+    }
+
+    /// Debug: the virtual clip's button pressed five times and held (its passphrase back to the factory one).
+    func resetVirtualClipPassword() async {
+        await virtualClip.resetPasswordOnClip()
+        sendLog("debug: the virtual clip’s Wi‑Fi password was reset on the clip")
     }
 
     // MARK: Status line

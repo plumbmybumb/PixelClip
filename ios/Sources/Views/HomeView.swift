@@ -17,6 +17,7 @@ struct HomeView: View {
             // the Recent strip may be below the fold. Larger text scrolls.
             VStack(alignment: .leading, spacing: typeSize.isAccessibilitySize ? 18 : 12) {
                 header
+                if session.showsPasswordNotice { passwordNotice }
                 nowSection
                 verbs
                 ExtrasRow()
@@ -64,6 +65,39 @@ struct HomeView: View {
             .accessibilityLabel("Settings")
             .accessibilityIdentifier("settingsButton")
         }
+    }
+
+    // MARK: The clip's own Wi‑Fi password (once, after the automatic setup)
+
+    private var passwordNotice: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "lock.fill")
+                .foregroundStyle(Color.accentColor)
+                .accessibilityHidden(true)
+            Text("Your clip now has its own Wi‑Fi password, saved on this iPhone. You can see it in Settings, Advanced.")
+                .font(.footnote)
+                .foregroundStyle(Z2.text)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            Button { withAnimation(Z2.spring) { session.dismissPasswordNotice() } } label: {
+                Image(systemName: "xmark")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(Z2.secondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(Z2Press(scale: 0.92))
+            .accessibilityLabel("Dismiss")
+            .accessibilityIdentifier("passwordNoticeDismiss")
+        }
+        .padding(.leading, 14)
+        .padding(.vertical, 8)
+        .padding(.trailing, 4)
+        .background(Z2.card, in: .rect(cornerRadius: 16, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Z2.border, lineWidth: 1) }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("passwordNotice")
+        .transition(.opacity)
     }
 
     // MARK: Now

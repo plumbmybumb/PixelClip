@@ -95,7 +95,9 @@ running (no cell connected yet), press one button briefly. RESET restarts the ch
 boot log; a short press on BOOT does not.
 
 - **BOOT** is the only button the software reads. Short press: next item. Long press (1.5 to 6 s): open the
-  WiFi hotspot. Hold 6 s or more: power off. Double taps and a few special cases (reader, tarot) are in
+  WiFi hotspot. Hold 6 s or more: power off. A short press while the clip shows "Update?" allows a firmware
+  update. Five quick presses, then a long press while it shows "Reset WiFi password?", put the hotspot password
+  back to the default. Double taps and a few special cases (reader, tarot) are in
   [`../firmware/README.md`](../firmware/README.md), "Using the clip".
 - **RESET** restarts the chip at once. Software cannot see it.
 
@@ -293,11 +295,22 @@ membership. To try the app without hardware, `./build.sh run` uses a built-in vi
 
 If Bluetooth is off or the clip does not answer, hold BOOT for 1.5 s or more to open the hotspot first.
 
-### 20. Change the hotspot password
+### 20. The clip gets its own hotspot password
 
-Every clip starts with the same published WiFi password. Set your own on the clip with the `ap_password` config
-key, then enter the same password in the app under Settings ▸ Advanced ▸ Hotspot password. See the root
-[`README.md`](../README.md), "Things to know before you wear it".
+Every clip starts with the same published WiFi password. The first time the app sends something over WiFi (a
+picture, as in step 19) it gives the clip a random password of its own and shows a note saying so. You do not
+type anything. Expect iOS to ask once more to join `PixelClip-XXXX` at the next send over WiFi, because the
+saved network is installed again with the new password.
+
+- To see or copy the password (for a second phone): Settings ▸ Advanced in the app.
+- If it is ever lost: press BOOT five times quickly, then hold it while the clip shows "Reset WiFi password?".
+  The clip goes back to the default password and keeps its content.
+
+**Not yet tried on a real clip and phone:** this password setup, the reset gesture and the button press for
+firmware updates were built and tested against the simulator and the offline mock only. If the app cannot join
+after the change, the reset gesture, or `ERASE=1 firmware/scripts/flash.sh` over USB (which wipes the clip's
+content), gets you back to the default. See the root [`README.md`](../README.md), "Things to know before you
+wear it".
 
 ### 21. Check the motion sensor
 

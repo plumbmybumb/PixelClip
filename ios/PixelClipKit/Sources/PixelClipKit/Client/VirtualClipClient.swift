@@ -43,6 +43,12 @@ import Foundation
 ///   `OracleCompositor` draws the screens. §5f.8: while a draw is in progress (any state but waits) the item's end,
 ///   queue entries and windows wait until it is back at waits.
 ///   `/status` reports `oracle:<id>` and `"oracle":{…}` while one shows.
+/// - Hotspot passphrase: write-only (`ap_password`, Wi‑Fi only: `413 use_wifi` over Bluetooth); the config's
+///   read-only `ap_password_set` says whether it differs from the factory one. A new one takes effect at the next
+///   Wi‑Fi session (`acceptsJoin`); `resetPasswordOnClip()` is the button's five presses and a hold.
+/// - Firmware update gate: `POST /ota/ask` asks for 60 s, a press (`pressButton()`) during it allows uploads for
+///   120 s, `POST /ota` while not allowed is `403 press_button` (and starts asking). `Options.legacyFirmware`
+///   answers like firmware that predates both (no `ap_password_set`, 404 on the gate, uploads always accepted).
 public actor VirtualClipClient: ClipClient {
 
     public struct Options: Sendable {
@@ -53,11 +59,14 @@ public actor VirtualClipClient: ClipClient {
         public var maxAssets: Int
         public var deviceID: String
         public var firmware: String
+        /// Answer like firmware that predates `ap_password_set` and the update gate.
+        public var legacyFirmware: Bool
         public init(latency: Duration = .milliseconds(60), bytesPerSecond: Int = 400_000,
                     storageTotal: Int = 12_582_912, maxAssets: Int = 256,
-                    deviceID: String = "7c1e", firmware: String = "0.1.0-virtual") {
+                    deviceID: String = "7c1e", firmware: String = "0.1.0-virtual", legacyFirmware: Bool = false) {
             self.latency = latency; self.bytesPerSecond = bytesPerSecond; self.storageTotal = storageTotal
             self.maxAssets = maxAssets; self.deviceID = deviceID; self.firmware = firmware
+            self.legacyFirmware = legacyFirmware
         }
         /// No delays: for tests.
         public static let instant = Options(latency: .zero, bytesPerSecond: 0)
@@ -140,6 +149,15 @@ public actor VirtualClipClient: ClipClient {
     @TaskLocal public static var transport: Transport = .wifi
     public private(set) var sessionEndCount = 0
     public private(set) var otaImages: [Data] = []
+    /// The passphrase the current (or, outside a session, the next) Wi‑Fi session uses.
+    private var sessionPassphrase = HotspotDefaults.password
+    /// The update gate: asking since, allowed until.
+    private var otaAskSince: Date?
+    private var otaAllowedUntil: Date?
+    /// Demo: a press of the button this long after the clip starts asking (nil: only `pressButton()`).
+    private var otaAutoPress: Duration?
+    public static let otaAskSeconds: TimeInterval = 60
+    public static let otaAllowSeconds: TimeInterval = 120
 
     public init(options: Options = Options(), clock: @escaping @Sendable () -> Date = { Date() }) {
         self.options = options
@@ -200,6 +218,8 @@ public actor VirtualClipClient: ClipClient {
         lastBLEWake = .none
         imuMap = .identity; imuCalibrated = false; imuCaptures = (nil, nil)
         oracle = nil; oracleReaders = [:]
+        sessionPassphrase = HotspotDefaults.password
+        otaAskSince = nil; otaAllowedUntil = nil
         engine = PlaybackEngine(now: deviceNow)
     }
 
@@ -443,15 +463,20 @@ public actor VirtualClipClient: ClipClient {
         return answered(cfg)
     }
 
-    /// As the firmware: the hotspot passphrase is write-only, no answer carries it (PROTOCOL §4).
+    /// As the firmware: the hotspot passphrase is write-only, no answer carries it (PROTOCOL §4); the
+    /// read-only `ap_password_set` says whether it is still the factory one.
     private func answered(_ c: ClipConfig) -> ClipConfig {
         var out = c
         out.apPassword = nil
+        out.apPasswordSet = options.legacyFirmware ? nil : (c.apPassword ?? HotspotDefaults.password) != HotspotDefaults.password
         return out
     }
 
     public func putConfig(_ patch: ClipConfig) async throws -> ClipConfig {
         try await enter("PUT /config")
+        if patch.apPassword != nil, Self.transport == .bluetooth, !options.legacyFirmware {
+            throw err(413, "use_wifi", "Set the hotspot password over the clip’s Wi‑Fi.")
+        }
         if let problem = patch.validationProblem { throw err(422, "invalid_config", problem) }
         let nameChanged = patch.name != nil && patch.name != cfg.name
         cfg = cfg.merging(patch)
@@ -527,6 +552,13 @@ public actor VirtualClipClient: ClipClient {
     public func ota(firmware: Data, progress: ProgressHandler?) async throws {
         try await enter("POST /ota")
         guard !firmware.isEmpty else { throw err(411, "length_required", "Empty image.") }
+        if !options.legacyFirmware {
+            // Refused from the headers, before the body is read; the clip starts asking for the press.
+            guard otaGate().allowed else {
+                otaAskSince = clock()
+                throw err(403, "press_button", "Press the button on the clip to allow the update.")
+            }
+        }
         let steps = 20
         for i in 1...steps {
             if options.bytesPerSecond > 0 {
@@ -535,16 +567,77 @@ public actor VirtualClipClient: ClipClient {
             progress?(Double(i) / Double(steps))
         }
         otaImages.append(firmware)
+        otaAllowedUntil = nil
+    }
+
+    public func otaState() async throws -> OTAState {
+        try await enter("GET /ota")
+        guard !options.legacyFirmware else { throw err(404, "not_found", "No route /ota.") }
+        return otaGate()
+    }
+
+    public func askOTA() async throws -> OTAState {
+        try await enter("POST /ota/ask")
+        guard !options.legacyFirmware else { throw err(404, "not_found", "No route /ota/ask.") }
+        guard Self.transport == .wifi else { throw err(413, "use_wifi", "Ask over the clip’s Wi‑Fi.") }
+        // Starts or restarts the asking window, unless updates are already allowed.
+        if !otaGate().allowed { otaAskSince = clock() }
+        return otaGate()
+    }
+
+    /// The gate now: an ask expires after 60 s, an allowance after 120 s; the demo's press lands here.
+    private func otaGate() -> OTAState {
+        let now = clock()
+        if let since = otaAskSince, let auto = otaAutoPress, now >= since.addingTimeInterval(auto.seconds) {
+            otaAskSince = nil
+            otaAllowedUntil = since.addingTimeInterval(auto.seconds + Self.otaAllowSeconds)
+        }
+        if let since = otaAskSince, now >= since.addingTimeInterval(Self.otaAskSeconds) { otaAskSince = nil }
+        if let until = otaAllowedUntil, now >= until { otaAllowedUntil = nil }
+        if let until = otaAllowedUntil {
+            return OTAState(allowed: true, asking: false, secondsLeft: Int(until.timeIntervalSince(now).rounded(.up)))
+        }
+        if let since = otaAskSince {
+            let left = since.addingTimeInterval(Self.otaAskSeconds).timeIntervalSince(now)
+            return OTAState(allowed: false, asking: true, secondsLeft: Int(left.rounded(.up)))
+        }
+        return OTAState(allowed: false, asking: false, secondsLeft: 0)
+    }
+
+    /// Demo: press the button by itself this long after the clip starts asking for an update (nil: never).
+    public func setAutoPressForUpdate(after delay: Duration?) { otaAutoPress = delay }
+
+    /// Tests: the update gate as the clip holds it, without a request.
+    public var updateGate: OTAState { otaGate() }
+
+    // MARK: Hotspot passphrase
+
+    /// Whether joining the clip's Wi‑Fi with `passphrase` works now: the passphrase of the session that is
+    /// on, else the one the next session starts with.
+    public func acceptsJoin(passphrase: String) -> Bool {
+        passphrase == (inSession ? sessionPassphrase : (cfg.apPassword ?? HotspotDefaults.password))
+    }
+
+    /// The button's five quick presses and a hold: the passphrase back to the factory one; a running session ends.
+    public func resetPasswordOnClip() {
+        cfg.apPassword = HotspotDefaults.password
+        if inSession { endWiFiSession() }
+    }
+
+    /// The Wi‑Fi session ends (the update permission with it); the panel comes back.
+    private func endWiFiSession() {
+        sessionEndCount += 1
+        inSession = false
+        otaAllowedUntil = nil
+        engine.setOutput(true, now: deviceNow)
     }
 
     public func endSession() async throws {
         try await enter("POST /session/end")
         // Over Bluetooth with no session open there's nothing to end.
         guard inSession || Self.transport == .wifi else { return }
-        sessionEndCount += 1
-        inSession = false
         // Display comes back; anything queued during the session starts now (if within 600 s).
-        engine.setOutput(true, now: deviceNow)
+        endWiFiSession()
     }
 
     public func scenes() async throws -> SceneCatalog {
@@ -665,8 +758,14 @@ public actor VirtualClipClient: ClipClient {
         return engine.readerNow
     }
 
-    /// Debug/tests: pause or resume without opening an upload session (the clip's BOOT short press).
+    /// Debug/tests: a short press of the clip's button without opening an upload session. While the clip
+    /// asks for an update it allows it (120 s); otherwise it pauses or resumes the reading.
     public func pressButton() {
+        if !options.legacyFirmware, otaGate().asking {
+            otaAskSince = nil
+            otaAllowedUntil = clock().addingTimeInterval(Self.otaAllowSeconds)
+            return
+        }
         _ = playbackState()
         if engine.readerPaused { engine.readerResume(now: deviceNow) } else { engine.readerPause(now: deviceNow) }
     }
@@ -972,7 +1071,11 @@ public actor VirtualClipClient: ClipClient {
     /// Upload mode on: catch the panel up to now (queue entries due before the button press fire as
     /// they would have), then, in panel-off mode, switch it off for the session.
     private func startSession() {
-        if !inSession { _ = playbackState() }
+        if !inSession {
+            _ = playbackState()
+            // A new passphrase takes effect with the next session.
+            sessionPassphrase = cfg.apPassword ?? HotspotDefaults.password
+        }
         inSession = true
         if !cfg.screenStaysOn { engine.setOutput(false, now: deviceNow) }
     }
@@ -1015,11 +1118,7 @@ public actor VirtualClipClient: ClipClient {
     public func bleEnd() -> Bool {
         guard bleAdvertising else { return false }
         lastBLEWake = .accepted
-        if inSession {
-            sessionEndCount += 1
-            inSession = false
-            engine.setOutput(true, now: deviceNow)
-        }
+        if inSession { endWiFiSession() }
         return true
     }
 

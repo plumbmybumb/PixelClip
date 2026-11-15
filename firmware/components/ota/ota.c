@@ -1,8 +1,10 @@
 /* ota.c — esp_ota wrapper with streaming hash. */
 #include "ota.h"
+#include "ota_gate.h"
 
 #include <stdlib.h>
 #include <string.h>
+#include "freertos/FreeRTOS.h"
 #include "esp_ota_ops.h"
 #include "esp_timer.h"
 #include "esp_system.h"
@@ -128,4 +130,69 @@ void ota_schedule_mark_valid(uint32_t delay_s)
         esp_err_t err = esp_timer_start_once(t, (uint64_t)delay_s * 1000000);
         if (err != ESP_OK) ESP_LOGE(TAG, "timer: %s", esp_err_to_name(err));
     }
+}
+
+/* ---- the button permission (ota.h): ota_gate.c under a spinlock, on the uptime clock ---- */
+
+static ota_gate_t s_gate;   /* zero = idle */
+static portMUX_TYPE s_gate_mux = portMUX_INITIALIZER_UNLOCKED;
+static void (*s_gate_listener)(void);
+
+static uint64_t now_ms(void)
+{
+    return (uint64_t)esp_timer_get_time() / 1000;
+}
+
+static void gate_read_locked(uint64_t now, ota_permission_t *out)
+{
+    const ota_gate_state_t st = ota_gate_state(&s_gate, now);
+    out->allowed = st == OTA_GATE_ALLOWED;
+    out->asking = st == OTA_GATE_ASKING;
+    out->ms_left = ota_gate_ms_left(&s_gate, now);
+    out->seconds_left = ota_gate_seconds_left(&s_gate, now);
+}
+
+void ota_permission_get(ota_permission_t *out)
+{
+    const uint64_t now = now_ms();
+    portENTER_CRITICAL(&s_gate_mux);
+    gate_read_locked(now, out);
+    portEXIT_CRITICAL(&s_gate_mux);
+}
+
+void ota_permission_ask(ota_permission_t *out)
+{
+    const uint64_t now = now_ms();
+    ota_permission_t p;
+    portENTER_CRITICAL(&s_gate_mux);
+    ota_gate_ask(&s_gate, now);
+    gate_read_locked(now, &p);
+    portEXIT_CRITICAL(&s_gate_mux);
+    ESP_LOGI(TAG, "update permission: %s (%lu s left)", p.allowed ? "already allowed" : "asking", (unsigned long)p.seconds_left);
+    if (out) *out = p;
+    if (s_gate_listener) s_gate_listener();
+}
+
+bool ota_permission_press(void)
+{
+    const uint64_t now = now_ms();
+    portENTER_CRITICAL(&s_gate_mux);
+    const bool used = ota_gate_press(&s_gate, now);
+    portEXIT_CRITICAL(&s_gate_mux);
+    if (used) ESP_LOGI(TAG, "update permission: allowed for %u s by the button", (unsigned)(OTA_GATE_ALLOW_MS / 1000));
+    return used;
+}
+
+void ota_permission_clear(void)
+{
+    portENTER_CRITICAL(&s_gate_mux);
+    const bool was = ota_gate_state(&s_gate, now_ms()) != OTA_GATE_IDLE;
+    ota_gate_clear(&s_gate);
+    portEXIT_CRITICAL(&s_gate_mux);
+    if (was) ESP_LOGI(TAG, "update permission: cleared");
+}
+
+void ota_permission_set_listener(void (*cb)(void))
+{
+    s_gate_listener = cb;
 }

@@ -166,7 +166,7 @@ public final class VirtualFastLane: FastLaneLink {
     /// Runs one fast-lane request on the virtual clip and answers it as the firmware would.
     public static func respond(to request: FastLaneRequest?, clip: VirtualClipClient) async -> FastLaneResponse {
         guard let request else { return FastLaneResponse(status: 400, body: envelope("bad_request", "Malformed request line.")) }
-        if request.route.isBulk {
+        if request.route.isBulk || request.route.isWiFiOnly {
             return FastLaneResponse(status: 413, body: envelope("use_wifi", "Bulk transfers need the clip’s Wi‑Fi."))
         }
         if request.body.count > PixelClipBLE.apiMaxBytes {
@@ -195,7 +195,7 @@ public final class VirtualFastLane: FastLaneLink {
     private static func route(_ r: FastLaneRequest, clip: VirtualClipClient) async throws -> FastLaneResponse {
         let dec = ClipJSON.decoder()
         func body<T: Decodable>(_ t: T.Type) throws -> T { try dec.decode(T.self, from: r.body) }
-        func ok<T: Encodable>(_ value: T) throws -> FastLaneResponse { FastLaneResponse(status: 200, body: try ClipJSON.encoder().encode(value)) }
+        func ok<T: Encodable>(_ value: T) throws -> FastLaneResponse { FastLaneResponse(status: 200, body: try ClipJSON.answerEncoder().encode(value)) }
         let done = try ok(OKResponse())
         let path = r.path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? r.path
         let parts = path.split(separator: "/").map(String.init)
@@ -234,12 +234,13 @@ public final class VirtualFastLane: FastLaneLink {
         case ("POST", "oracle", 2) where parts[1] == "back":
             try await clip.oracleBack()
             return done
+        case ("GET", "ota", 1): return try ok(await clip.otaState())
         case ("GET", "imu", 1): return try ok(await clip.imu())
         case ("POST", "imu", 2) where parts[1] == "calibrate":
             return try ok(await clip.calibrateIMU(body(IMUCalibrationRequest.self).step))
         default:
             let known = ["status", "assets", "playlist", "config", "time", "show", "next", "prev", "brightness",
-                         "session", "scenes", "batlog", "texts", "fonts", "reader", "imu", "oracle"]
+                         "session", "scenes", "batlog", "texts", "fonts", "reader", "imu", "oracle", "ota"]
             return known.contains(parts.first ?? "")
                 ? FastLaneResponse(status: 405, body: envelope("method_not_allowed", "\(r.method) isn’t allowed on \(path)."))
                 : FastLaneResponse(status: 404, body: envelope("not_found", "No route \(path)."))

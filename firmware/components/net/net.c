@@ -27,6 +27,7 @@
 #include "power.h"
 #include "health.h"
 #include "pixelclip_ble.h"
+#include "ota.h"
 #include "freertos/semphr.h"
 #include "sdkconfig.h"
 
@@ -403,7 +404,7 @@ static esp_err_t start_httpd(void)
 {
     httpd_config_t hc = HTTPD_DEFAULT_CONFIG();
     hc.stack_size = HTTPD_STACK;
-    hc.max_uri_handlers = 48;    /* 44 routes registered (http_api.c) */
+    hc.max_uri_handlers = 48;    /* 41 routes registered (http_api.c), 43 in bench builds */
     hc.max_open_sockets = 4;
     hc.lru_purge_enable = true;
     /* Slow clients (security audit WIFI-8, http_api.c "slow-client guard"): every blocking socket call returns
@@ -496,6 +497,8 @@ void net_session_stop(void)
         if (err != ESP_OK) ESP_LOGE(TAG, "httpd_stop: %s", esp_err_to_name(err));
         s_httpd = NULL;
     }
+    /* The update permission belongs to the session it was given in (after httpd_stop: no request can ask again). */
+    ota_permission_clear();
     mdns_free();
     health_step(HEALTH_STEP_SESSION_STOP_WIFI);
     /* Radio off, driver kept: esp_wifi_stop() releases the PHY (refcounted with BLE) and the driver's own PM

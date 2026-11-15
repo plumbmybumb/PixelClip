@@ -191,6 +191,9 @@ final class VirtualClipTests: XCTestCase {
     func testOTAProgress() async throws {
         let clip = VirtualClipClient(options: .instant)
         let box = ProgressBox()
+        // The update gate (SECURITY-AUDIT WIFI-2): asked, then the button pressed on the clip.
+        _ = try await clip.askOTA()
+        await clip.pressButton()
         try await clip.ota(firmware: Data(repeating: 0xE9, count: 1000)) { box.add($0) }
         XCTAssertEqual(box.values.last, 1)
         let images = await clip.otaImages

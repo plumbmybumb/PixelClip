@@ -81,7 +81,7 @@ reduced motion respected, VoiceOver labels on every icon button.
 | **Extras** (sheets) | `ExtraSheet` + `ExtraLayout`; `ScenesExtra`, `LoopsExtra` (same file), `TarotExtra` + `TarotReadingsView` + `TarotCardEditor` (`ExtraTarot.swift`), `ReaderExtra` | `SceneAnimation`, `StarterStore`, `TarotSettings` / `TarotBundle` / `TarotMaker` (`Model/TarotStore.swift`), `ReaderPlayer`, `ReaderStore` |
 | Re-send | `ResendSheet` (Recent ▸ a thumbnail); long-press a thumbnail ▸ Remove from recents (hidden at once, the library copy goes 5 s later unless the clip or the playlist uses it) | — |
 | **Settings** | `SettingsView`: Clip (brightness, auto-rotate + upside down, battery), If something's off (`CantFindClipSheet` in `HelpViews`, `CalibrationSheet`, Advanced) | `ClipSession` |
-| Advanced | `AdvancedSettingsView`: clip name, screen on while receiving, Wi‑Fi always on / timeout, sleep level, Bluetooth wake, hotspot password, forget Wi‑Fi, reset the motion sensor, firmware update, battery log + reset, the clip's raw status, About, Debug (virtual clip) | old `SettingsView` internals |
+| Advanced | `AdvancedSettingsView`: clip name, screen on while receiving, Wi‑Fi always on / timeout, sleep level, Bluetooth wake, the clip's Wi‑Fi password (show, copy, enter), forget Wi‑Fi, reset the motion sensor, firmware update (asks for the clip's button), battery log + reset, the clip's raw status, About, Debug (virtual clip) | old `SettingsView` internals |
 | Share extension | `ShareExtension/`: a photo/GIF/video goes to `MediaInbox` (App Group) and opens in Send's crop screen when PixelClip becomes active (`App/ShareInbox.swift`); a text or link goes to `ReaderInbox` and opens in the Reader extra | `ShareSheetView`, `ReaderStore.importInbox` |
 
 **The Extras.** *Tarot*: see [The Tarot](#the-tarot-oracle-protocol-5f) below. *Scenes*: the five
@@ -350,6 +350,28 @@ status line, the Sender's toasts and the playlist.
     forgotten. Settings ▸ Advanced ▸ **Forget the clip’s Wi‑Fi** removes the remembered network
     (`NEHotspotConfigurationManager.removeConfiguration` for every configured `PixelClip-…` SSID and the
     prefix) and the clock records.
+  - **The clip's own Wi‑Fi password** (`PixelClipKit/Hotspot/HotspotPasswords.swift`). A clip leaves the factory
+    with the published passphrase. The first time the app is on its Wi‑Fi and the config says
+    `"ap_password_set":false` while the app uses the factory passphrase too, it gives the clip a random one
+    (`HotspotPasswordGenerator`: 24 characters without 0 O 1 l I, `SecRandomCopyBytes`): saved as *pending* in
+    the Keychain (`KeychainHotspotPasswordStore`: after first unlock, not synchronised, no access group), sent
+    as `PUT /config {"ap_password"}` over HTTP only (`SmartClipClient` never routes a patch with `ap_password` to
+    the fast lane, and `FastLaneClipClient` refuses one), then promoted to *current*. It applies from the clip's
+    next Wi‑Fi session, so until that session has ended the factory passphrase is tried first. Each connect asks
+    `HotspotPasswords.plan(current:pending:clipReportsSet:)` (the flag from the last config read, over Bluetooth
+    or Wi‑Fi): *current*; or, when the clip says its passphrase is the factory one again, nothing (the "Set up
+    again" state; never a silent fall back); *pending* (promoted after a join with it) or the factory one when
+    the answer was lost; "This clip has its own Wi‑Fi password" when the clip says it has one this iPhone
+    doesn't know. A join with a passphrase other than the one the remembered network was installed with removes
+    it and installs it again (`HotspotConfiguring.replaceRemembered`): iOS asks to join once more. Firmware
+    without the flag: nothing automatic. Settings ▸ Advanced shows and copies it (for a second iPhone) and takes
+    a typed one, which is never replaced automatically. The old UserDefaults copy is migrated once and removed.
+    The virtual clip keeps its own in memory (`InMemoryHotspotPasswordStore`), as it starts from the factory
+    passphrase at every launch.
+  - **Firmware updates ask for the clip's button** (`FirmwareUpdater`): `POST /ota/ask` (Wi‑Fi only), "Press the
+    button on your clip to allow the update" with the seconds left and Cancel while `GET /ota` is polled once a
+    second, then `POST /ota`. 404 (older firmware): the upload at once. `403 press_button` from the upload: the
+    same guidance again. The virtual clip models the gate; in the app's virtual mode it presses by itself after 3 s.
   - **Bluetooth reuse and overlap** (see the doorbell above): the Nearby link is reused, the scan exits on
     the first match, the probe runs alongside the ring and the join starts at the acknowledged write.
   - **No-ops skipped** (`SendSkipRules`, PixelClipKit/Sync): `POST /time` only when the first `/status` says
@@ -586,7 +608,8 @@ Still different or unverified:
 
 The virtual-clip toggle defaults to off on a device, and doesn't exist in a Release build
 (`./build.sh device-release`; `./build.sh device` installs a Debug build, which has it). The hotspot
-password the app uses lives in Settings ▸ Advanced (default `pixelclip-2026`).
+password the app uses can be seen, copied and entered in Settings ▸ Advanced (the factory default
+`pixelclip-2026` until the app's first send over Wi‑Fi gives the clip its own).
 
 **Entitlements / Info.plist** (all in `project.yml`):
 - `com.apple.developer.networking.HotspotConfiguration` — `NEHotspotConfiguration` by SSID prefix
@@ -729,7 +752,8 @@ the phone's language list. Everything else stays between the phone and the clip.
   frames, form fields and comments (`PixelClipSharePreprocessor.js` drops them before anything is stored).
 - Temporary copies are deleted when done: the extension's `tmp/share-…` when the item is saved or cancelled
   (and at its next start), the app's `tmp/import-…` when the crop screen closes (and at launch).
-- UserDefaults: settings, the playlist, what is on the clip, and the hotspot password (in plain text).
+- UserDefaults: settings, the playlist and what is on the clip. The clip's Wi‑Fi password is in the Keychain
+  (readable after first unlock, not synced through iCloud); builds before that kept it in UserDefaults, and it is moved once.
 
 **File protection.** The inboxes are `NSFileProtectionComplete` (readable only while the iPhone is unlocked;
 the app and the extension only run on screen). The library and the Reader's texts are

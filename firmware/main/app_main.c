@@ -38,6 +38,7 @@
 #include "pixelclip_ble.h"
 #include "health.h"
 #include "bench.h"
+#include "press_seq.h"
 #include "esp_app_desc.h"
 
 static const char *TAG = "app";
@@ -51,6 +52,7 @@ static const char *TAG = "app";
 #define SESSION_LOW_MV   3900    /* battery mode: sessions blank the panel below this */
 #define DOUBLE_PRESS_MS  400     /* reader: two short presses this close (release to release) = next item */
 #define ORACLE_DOUBLE_MS 350     /* oracle (PROTOCOL §5f.3): two taps this close = the previous screen */
+#define OVERLAY_ACK_MS   1500    /* "Update allowed", "WiFi password reset" */
 
 typedef enum {
     EV_BUTTON_SHORT,
@@ -68,13 +70,24 @@ typedef enum {
     EV_SESSION_LOW,      /* on battery, in a screen-on session, Vbat < 3.9 V: blank the panel */
     EV_BENCH_START,      /* CONFIG_PIXELCLIP_BENCH_SLEEP_TEST: start / end an upload session */
     EV_BENCH_END,
+    EV_OVERLAY,          /* the update prompt or the password reset window may have to appear or go (overlay_sync) */
 } app_event_t;
+
+/* A prompt drawn over whatever the clip shows (system_screen), while the player output is off. */
+typedef enum {
+    OVL_NONE,
+    OVL_UPDATE,          /* the clip asks for a press to allow a firmware update (ota.h permission) */
+    OVL_RESET,           /* the hotspot password reset window is open (press_seq.h) */
+} overlay_t;
 
 static QueueHandle_t s_events;
 static esp_timer_handle_t s_single_timer;
 static bool s_single_pending;
 static bool s_single_oracle;    /* the pending single press is an oracle tap (next screen), not the reader's toggle */
 static bool s_session_live;     /* the running session keeps the panel playing (display_during_upload) */
+static overlay_t s_overlay;     /* on screen now */
+static esp_timer_handle_t s_overlay_timer;   /* the next edge of the asking or reset window */
+static press_seq_t s_reset_seq; /* the password reset gesture; controller task only */
 
 static void post(app_event_t ev)
 {
@@ -104,6 +117,22 @@ static void on_bench(bool start)
 static void single_press_cb(void *arg)
 {
     post(EV_BUTTON_SINGLE);
+}
+
+/* The httpd task asked for an update permission; the overlay timer reached a window's edge. */
+static void overlay_poke(void)
+{
+    post(EV_OVERLAY);
+}
+
+static void overlay_timer_cb(void *arg)
+{
+    post(EV_OVERLAY);
+}
+
+static uint64_t uptime_ms(void)
+{
+    return (uint64_t)esp_timer_get_time() / 1000;
 }
 
 /* Short press. While an oracle item is on screen (PROTOCOL §5f.3) a tap is the next screen and two taps within
@@ -179,6 +208,68 @@ static void system_screen(const char *line1, const char *line2, uint16_t color)
     display_set_brightness(cfg.brightness < 40 ? 40 : cfg.brightness);
 }
 
+/* ---- overlays: the update prompt and the password reset window, drawn over any mode ---- */
+
+/* The screen as the current mode has it, after an overlay or a confirmation: a panel-off session goes dark again
+ * (with the current item in the framebuffer for /screenshot), anything else plays on. */
+static void screen_restore(void)
+{
+    display_fade_to(0, DISPLAY_FADE_MS);
+    if (net_session_active() && !s_session_live) {
+        display_off();
+        player_refresh_offscreen();
+    } else {
+        player_set_output(true);
+    }
+}
+
+/* Also in a panel-off session: the prompt wakes the panel (system_screen), since a press nobody is asked for is
+ * one nobody makes. Black with two lines of text: little current on an AMOLED. */
+static void overlay_show(overlay_t o)
+{
+    if (s_overlay == OVL_NONE) player_set_output(false);
+    s_overlay = o;
+    if (o == OVL_UPDATE) {
+        system_screen("Update?", "press the button", DISPLAY_RGB565BE(255, 200, 60));
+    } else {
+        system_screen("Reset WiFi password?", "hold to confirm", DISPLAY_RGB565BE(255, 120, 80));
+    }
+}
+
+/* A brief confirmation in place of any overlay, then the screen as before. */
+static void overlay_ack(const char *line1, const char *line2, uint16_t color)
+{
+    if (s_overlay == OVL_NONE) player_set_output(false);
+    s_overlay = OVL_NONE;
+    system_screen(line1, line2, color);
+    vTaskDelay(pdMS_TO_TICKS(OVERLAY_ACK_MS));
+    screen_restore();
+}
+
+/* Bring the screen in line with the update permission and the reset window, and arm the timer for the next
+ * edge of either (asking ran out, the window closed). Controller task only. */
+static void overlay_sync(void)
+{
+    const uint64_t now = uptime_ms();
+    ota_permission_t p;
+    ota_permission_get(&p);
+    const uint32_t reset_left = press_seq_ms_left(&s_reset_seq, now);
+    const overlay_t want = reset_left ? OVL_RESET : p.asking ? OVL_UPDATE : OVL_NONE;
+    if (want != s_overlay) {
+        if (want == OVL_NONE) {
+            s_overlay = OVL_NONE;
+            screen_restore();
+        } else {
+            overlay_show(want);
+        }
+    }
+    uint32_t next_ms = reset_left;
+    if (p.asking && (next_ms == 0 || p.ms_left < next_ms)) next_ms = p.ms_left;
+    if (!s_overlay_timer) return;   /* no timer: the loop's own pass (HEALTH_FEED_PERIOD_MS) still catches the edge */
+    esp_timer_stop(s_overlay_timer);   /* ignore "not running" */
+    if (next_ms) esp_timer_start_once(s_overlay_timer, (uint64_t)next_ms * 1000 + 20000);   /* 20 ms past the edge */
+}
+
 static bool battery_ok_for_wifi_q(bool quiet)
 {
     power_battery_t b;
@@ -238,6 +329,7 @@ static void ble_state(pixelclip_ble_state_t *o)
  * false): splash 3 s, panel asleep for the whole session, the player renders offscreen for /screenshot. */
 static void enter_upload_mode(void)
 {
+    s_overlay = OVL_NONE;   /* the splash takes the screen; overlay_sync puts an open reset window back afterwards */
     if (!battery_ok_for_wifi()) {
         ESP_LOGW(TAG, "battery too low for WiFi");
         player_set_output(false);
@@ -344,14 +436,22 @@ static void usb_changed(void)
 
 /* `ack`: show the "Done" card (always after a panel-off session; after a screen-on session only when
  * the user ended it with the button, the content otherwise just loses its connection dot). */
-static void leave_upload_mode(bool ack)
+static void session_stop(void)
 {
-    if (!net_session_active()) return;
-    net_session_stop();
+    net_session_stop();            /* also ends an update permission (ota.h) */
     after_session_checks();
     timekeeping_save_anchor();     /* the session may have synced the clock: keep it across a power-off */
     player_set_badge(PLAYER_BADGE_OFF);
-    if (!s_session_live || ack) {
+}
+
+static void leave_upload_mode(bool ack)
+{
+    if (!net_session_active()) return;
+    /* An overlay on screen (the player output is off): the "Done" card takes its place and puts the content back. */
+    const bool covered = s_overlay != OVL_NONE;
+    s_overlay = OVL_NONE;
+    session_stop();
+    if (!s_session_live || ack || covered) {
         player_set_output(false);
         system_screen("Done", NULL, DISPLAY_RGB565BE(120, 255, 160));
         vTaskDelay(pdMS_TO_TICKS(DONE_SPLASH_MS));
@@ -360,6 +460,25 @@ static void leave_upload_mode(bool ack)
     }
     s_session_live = false;
     pixelclip_ble_status_changed();
+}
+
+/* The password reset gesture confirmed (README "Using the clip"): the factory passphrase again, for someone who lost
+ * the phone that knew the old one. A running session ends, so the next one uses it; an always-on hotspot comes
+ * straight back with it. Content, playlist and the other settings stay. */
+static void wifi_password_reset(void)
+{
+    const esp_err_t err = appcfg_reset_ap_password();   /* in memory even when saving failed */
+    if (s_overlay == OVL_NONE) player_set_output(false);
+    s_overlay = OVL_NONE;
+    system_screen("WiFi password reset", err == ESP_OK ? NULL : "not saved: until restart", DISPLAY_RGB565BE(120, 255, 160));
+    if (net_session_active()) {
+        session_stop();
+        s_session_live = false;
+        pixelclip_ble_status_changed();
+    }
+    vTaskDelay(pdMS_TO_TICKS(OVERLAY_ACK_MS));
+    screen_restore();
+    if (net_always_on()) enter_upload_mode();
 }
 
 /* display_on()/display_off() → the panel hold on automatic light sleep (see the call in app_main()). */
@@ -409,9 +528,20 @@ static void controller_loop(void)
          * runs at priority 1 (the lowest application priority) on CPU0: starving it also stops the feed. */
         health_feed();
         const uint32_t wait_ms = anchor_ms == 0 ? 1 : anchor_ms < HEALTH_FEED_PERIOD_MS ? anchor_ms : HEALTH_FEED_PERIOD_MS;
-        if (xQueueReceive(s_events, &ev, pdMS_TO_TICKS(wait_ms)) != pdTRUE) continue;
+        if (xQueueReceive(s_events, &ev, pdMS_TO_TICKS(wait_ms)) != pdTRUE) {
+            overlay_sync();   /* a lost post (queue full) cannot leave a prompt up, or missing, for good */
+            continue;
+        }
         switch (ev) {
         case EV_BUTTON_SHORT:
+            /* While the clip asks for an update permission, a short press gives it and does nothing else. */
+            if (ota_permission_press()) {
+                press_seq_other(&s_reset_seq, uptime_ms());   /* and it closes a reset window, like any other press */
+                overlay_ack("Update allowed", NULL, DISPLAY_RGB565BE(120, 255, 160));
+                break;
+            }
+            /* A press inside the reset window only cancels it; the presses that open it keep their meaning. */
+            if (press_seq_short(&s_reset_seq, uptime_ms()) == PRESS_SEQ_CANCEL) break;
             if (!net_session_active() || s_session_live) short_press();
             break;
         case EV_BUTTON_SINGLE:
@@ -426,6 +556,11 @@ static void controller_loop(void)
             }
             break;
         case EV_BUTTON_LONG:
+            /* Inside the reset window a long press confirms the reset and does not toggle the hotspot. */
+            if (press_seq_long(&s_reset_seq, uptime_ms()) == PRESS_SEQ_CONFIRM) {
+                wifi_password_reset();
+                break;
+            }
             if (net_session_active()) {
                 net_always_on_suspend();   /* "always reachable" off until the next boot */
                 leave_upload_mode(true);
@@ -477,6 +612,8 @@ static void controller_loop(void)
         case EV_BENCH_END:
             if (net_session_active()) leave_upload_mode(false);
             break;
+        case EV_OVERLAY:
+            break;   /* overlay_sync below */
         case EV_BUTTON_HOLD:
             power_off("bye", NULL, BYE_MS);
             break;
@@ -484,6 +621,7 @@ static void controller_loop(void)
             power_off("Battery low", "charge me", LOW_BAT_BANNER_MS);
             break;
         }
+        overlay_sync();   /* after every event: a session start or end, a press, an ask, a window edge */
     }
 }
 
@@ -579,6 +717,10 @@ void app_main(void)
     if (!s_events) abort();
     const esp_timer_create_args_t single = { .callback = single_press_cb, .name = "btn_single" };
     if (esp_timer_create(&single, &s_single_timer) != ESP_OK) s_single_timer = NULL;   /* then: no double press */
+    const esp_timer_create_args_t overlay = { .callback = overlay_timer_cb, .name = "overlay" };
+    if (esp_timer_create(&overlay, &s_overlay_timer) != ESP_OK) s_overlay_timer = NULL;   /* then: the loop's pass */
+    press_seq_init(&s_reset_seq);
+    ota_permission_set_listener(overlay_poke);   /* before any session: POST /ota/ask shows the prompt */
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     boot_step("nvs", init_nvs());               /* time/tz trust and WiFi PHY data degrade without it */

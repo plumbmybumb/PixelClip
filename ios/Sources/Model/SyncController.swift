@@ -468,7 +468,7 @@ final class SyncController {
         if !playlist.textIDs.isEmpty, let texts = try? await session.client.texts() { ReaderStore.shared.recordClipTexts(texts) }
         do {
             try await session.client.endSession()
-            session.markSessionEnded()
+            session.clipEndedSession()
             if let doc = readerDoc {
                 steps[.finish] = .done(readsNow ? "Look at your clip: it’s reading “\(doc.title)”" : "“\(doc.title)” plays until it’s finished")
             } else {

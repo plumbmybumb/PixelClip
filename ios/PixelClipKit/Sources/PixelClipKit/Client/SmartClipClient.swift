@@ -51,13 +51,14 @@ public final class SmartClipClient: ClipClient {
         self.links = links
     }
 
-    /// Runs `op` on the fast lane or on HTTP, per the rules above.
-    func route<T>(_ method: String, _ path: String, _ op: (any ClipClient) async throws -> T) async throws -> T {
+    /// Runs `op` on the fast lane or on HTTP, per the rules above. `wifiOnly`: never the fast lane
+    /// (a request whose body must not travel over Bluetooth, such as a new hotspot passphrase).
+    func route<T>(_ method: String, _ path: String, wifiOnly: Bool = false, _ op: (any ClipClient) async throws -> T) async throws -> T {
         let route = FastLaneRoute(method, path)
         let clock = ContinuousClock()
         let start = clock.now
         var triedLane = false
-        if route.isEligible, await !links.wifiOpen, let lane = await links.fastLane() {
+        if route.isEligible, !wifiOnly, await !links.wifiOpen, let lane = await links.fastLane() {
             triedLane = true
             do {
                 let value = try await op(lane)
@@ -90,7 +91,10 @@ public final class SmartClipClient: ClipClient {
     public func playlist() async throws -> Playlist { try await route("GET", "/playlist") { try await $0.playlist() } }
     public func putPlaylist(_ playlist: Playlist) async throws { try await route("PUT", "/playlist") { try await $0.putPlaylist(playlist) } }
     public func config() async throws -> ClipConfig { try await route("GET", "/config") { try await $0.config() } }
-    public func putConfig(_ patch: ClipConfig) async throws -> ClipConfig { try await route("PUT", "/config") { try await $0.putConfig(patch) } }
+    /// A new hotspot passphrase (`ap_password`) only ever goes over the clip's Wi‑Fi (the firmware refuses it over Bluetooth).
+    public func putConfig(_ patch: ClipConfig) async throws -> ClipConfig {
+        try await route("PUT", "/config", wifiOnly: patch.apPassword != nil) { try await $0.putConfig(patch) }
+    }
     public func setTime(_ time: TimeSync) async throws { try await route("POST", "/time") { try await $0.setTime(time) } }
 
     public func show(id: String, durationMs: Int?, scroll: PlaylistItem.Scroll?) async throws {
@@ -105,6 +109,9 @@ public final class SmartClipClient: ClipClient {
     public func ota(firmware: Data, progress: ProgressHandler?) async throws {
         try await route("POST", "/ota") { try await $0.ota(firmware: firmware, progress: progress) }
     }
+
+    public func otaState() async throws -> OTAState { try await route("GET", "/ota") { try await $0.otaState() } }
+    public func askOTA() async throws -> OTAState { try await route("POST", "/ota/ask") { try await $0.askOTA() } }
 
     public func endSession() async throws { try await route("POST", "/session/end") { try await $0.endSession() } }
     public func scenes() async throws -> SceneCatalog { try await route("GET", "/scenes") { try await $0.scenes() } }

@@ -804,11 +804,46 @@ static esp_err_t h_screenshot(api_req_t *req)
     return err;
 }
 
+/* The update permission (PROTOCOL §4 "Firmware update", security audit WIFI-2): an image is only taken after
+ * someone pressed the clip's button while it asked. Knowing the hotspot passphrase is not enough. */
+static esp_err_t send_ota_state(api_req_t *req, const ota_permission_t *p)
+{
+    cJSON *o = cJSON_CreateObject();
+    cJSON_AddBoolToObject(o, "ok", true);
+    cJSON_AddBoolToObject(o, "allowed", p->allowed);
+    cJSON_AddBoolToObject(o, "asking", p->asking);
+    cJSON_AddNumberToObject(o, "seconds_left", p->seconds_left);
+    return send_json(req, ST_200, o);
+}
+
+static esp_err_t h_ota_get(api_req_t *req)
+{
+    ota_permission_t p;
+    ota_permission_get(&p);
+    return send_ota_state(req, &p);
+}
+
+/* WiFi only (route table): the prompt is for someone who has joined the hotspot, not for anyone in BLE range. */
+static esp_err_t h_ota_ask(api_req_t *req)
+{
+    ota_permission_t p;
+    ota_permission_ask(&p);
+    return send_ota_state(req, &p);
+}
+
 static esp_err_t h_ota(api_req_t *req)
 {
     uint8_t sha[32];
     if (!header_sha(req, sha)) return send_error(req, ST_400, "missing_sha256", "X-Content-SHA256 required");
     if (req->content_len == 0) return send_error(req, ST_411, "empty_body", NULL);
+    /* Decided before any body byte is read. The refusal also asks, so a plain retry after the press works. */
+    ota_permission_t perm;
+    ota_permission_get(&perm);
+    if (!perm.allowed) {
+        ota_permission_ask(NULL);
+        return send_error(req, ST_403, "press_button",
+                          "press the button on the clip (it shows \"Update?\"), then send the update again");
+    }
     if (!upload_admitted(req)) return ESP_OK;
     ota_session_t *s = NULL;
     esp_err_t err = ota_begin(req->content_len, &s);
@@ -841,6 +876,7 @@ static esp_err_t h_ota(api_req_t *req)
     err = ota_finish(s, sha);
     if (err == ESP_ERR_INVALID_CRC) return send_error(req, ST_422, "sha256_mismatch", "body does not match X-Content-SHA256");
     if (err != ESP_OK) return send_error(req, ST_422, "invalid_image", esp_err_to_name(err));
+    ota_permission_clear();   /* one press, one image (a failed upload above keeps the permission until it runs out) */
     err = send_ok(req);
     ota_restart_in(1000);
     return err;
@@ -1419,7 +1455,8 @@ esp_err_t api_bad_method(api_req_t *req)
  * GET /assets/{id}, GET /batlog, plus the GET /coredump extension), and the three development / bench routes
  * that the unpaired BLE link must not offer (security audits WIFI-10 / BLE-9): GET /imu (the wearer's head
  * motion), POST /imu/calibrate (replaces or erases the stored axis map) and POST /queue/test. The app only
- * calls /imu and /imu/calibrate after it has joined the hotspot (its calibration wizard connects first). */
+ * calls /imu and /imu/calibrate after it has joined the hotspot (its calibration wizard connects first).
+ * POST /ota/ask is WiFi only as well: someone in BLE range must not be able to put "Update?" on the screen. */
 const api_route_t api_routes[] = {
     { "/status",        HTTP_GET,    h_status,        false },
     { "/assets",        HTTP_GET,    h_assets_list,   false },
@@ -1441,6 +1478,8 @@ const api_route_t api_routes[] = {
     { "/brightness",    HTTP_POST,   h_brightness,    false },
     { "/screenshot",    HTTP_GET,    h_screenshot,    true  },
     { "/ota",           HTTP_POST,   h_ota,           true  },
+    { "/ota",           HTTP_GET,    h_ota_get,       false },   /* the update permission: fast-lane eligible */
+    { "/ota/ask",       HTTP_POST,   h_ota_ask,       true  },   /* the prompt on the clip: WiFi only */
     { "/session/end",   HTTP_POST,   h_session_end,   false },
     { "/batlog",        HTTP_GET,    h_batlog_get,    true  },
     { "/imu",           HTTP_GET,    h_imu,           true  },   /* bench: WiFi only */

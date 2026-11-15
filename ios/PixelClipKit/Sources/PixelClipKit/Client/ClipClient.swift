@@ -23,7 +23,12 @@ public protocol ClipClient: Sendable {
     func previous() async throws
     func setBrightness(_ value: Int) async throws
     func screenshot() async throws -> RGB565Frame
+    /// `POST /ota`. A clip with the update gate answers `403 press_button` unless its button allowed it.
     func ota(firmware: Data, progress: ProgressHandler?) async throws
+    /// `GET /ota`: the update gate (Wi‑Fi or the fast lane). 404 on firmware that predates it.
+    func otaState() async throws -> OTAState
+    /// `POST /ota/ask` (Wi‑Fi only): the clip shows "Update? press the button" for 60 s. 404 on older firmware.
+    func askOTA() async throws -> OTAState
     func endSession() async throws
     /// `GET /scenes`: live scenes the firmware supports.
     func scenes() async throws -> SceneCatalog
@@ -79,6 +84,18 @@ public enum ClipError: Error, Sendable, Equatable {
         if case .http(_, let env) = self { return env?.error }
         return nil
     }
+
+    /// The clip wants its button pressed before a firmware upload (`403 press_button`).
+    public var isPressButton: Bool {
+        if case .http(403, let env) = self { return env?.error == "press_button" }
+        return false
+    }
+
+    /// The route doesn't exist on this firmware (404).
+    public var isNotFound: Bool {
+        if case .http(404, _) = self { return true }
+        return false
+    }
 }
 
 extension ClipError: LocalizedError {
@@ -113,6 +130,10 @@ extension ClipError: LocalizedError {
 public extension ClipClient {
     /// "Show now" without a scroll block.
     func show(id: String, durationMs: Int?) async throws { try await show(id: id, durationMs: durationMs, scroll: nil) }
+
+    /// Clients without the update gate answer like firmware that predates it.
+    func otaState() async throws -> OTAState { throw ClipError.http(status: 404, envelope: ErrorEnvelope(error: "not_found", message: "No route /ota.")) }
+    func askOTA() async throws -> OTAState { throw ClipError.http(status: 404, envelope: ErrorEnvelope(error: "not_found", message: "No route /ota/ask.")) }
 }
 
 public extension ClipStatus {

@@ -820,6 +820,9 @@ public struct ClipConfig: Codable, Sendable, Equatable {
     public var wifiAlwaysOn: Bool?
     /// PROTOCOL §4 Orientation (default `auto`); nil on firmware that predates it.
     public var orientation: ClipOrientationMode?
+    /// Read-only (`ap_password_set`): false while the clip still has the factory passphrase, true once
+    /// another was set. Nil on firmware that predates it. Decoded from answers, never sent in a patch.
+    public var apPasswordSet: Bool?
 
     enum CodingKeys: String, CodingKey {
         case name, brightness
@@ -832,18 +835,42 @@ public struct ClipConfig: Codable, Sendable, Equatable {
         case displayDuringUpload = "display_during_upload"
         case wifiAlwaysOn = "wifi_always_on"
         case orientation
+        case apPasswordSet = "ap_password_set"
     }
 
     public init(name: String? = nil, brightness: Int? = nil, uploadTimeoutS: Int? = nil, apPassword: String? = nil,
                 lowBatteryPct: Int? = nil, defaultTransition: Transition? = nil, tzOffsetS: Int? = nil,
                 bleWake: Bool? = nil, displayDuringUpload: Bool? = nil, wifiAlwaysOn: Bool? = nil,
-                orientation: ClipOrientationMode? = nil) {
+                orientation: ClipOrientationMode? = nil, apPasswordSet: Bool? = nil) {
         self.name = name; self.brightness = brightness; self.uploadTimeoutS = uploadTimeoutS
         self.apPassword = apPassword; self.lowBatteryPct = lowBatteryPct
         self.defaultTransition = defaultTransition; self.tzOffsetS = tzOffsetS
         self.bleWake = bleWake; self.displayDuringUpload = displayDuringUpload; self.wifiAlwaysOn = wifiAlwaysOn
-        self.orientation = orientation
+        self.orientation = orientation; self.apPasswordSet = apPasswordSet
     }
+
+    /// Encodes as a patch: every key but the read-only `ap_password_set`, which only an answer carries
+    /// (an encoder whose `userInfo` has `ClipConfig.encodesAnswer` set to true, as the virtual clip's fast lane).
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(name, forKey: .name)
+        try c.encodeIfPresent(brightness, forKey: .brightness)
+        try c.encodeIfPresent(uploadTimeoutS, forKey: .uploadTimeoutS)
+        try c.encodeIfPresent(apPassword, forKey: .apPassword)
+        try c.encodeIfPresent(lowBatteryPct, forKey: .lowBatteryPct)
+        try c.encodeIfPresent(defaultTransition, forKey: .defaultTransition)
+        try c.encodeIfPresent(tzOffsetS, forKey: .tzOffsetS)
+        try c.encodeIfPresent(bleWake, forKey: .bleWake)
+        try c.encodeIfPresent(displayDuringUpload, forKey: .displayDuringUpload)
+        try c.encodeIfPresent(wifiAlwaysOn, forKey: .wifiAlwaysOn)
+        try c.encodeIfPresent(orientation, forKey: .orientation)
+        if encoder.userInfo[Self.encodesAnswer] as? Bool == true {
+            try c.encodeIfPresent(apPasswordSet, forKey: .apPasswordSet)
+        }
+    }
+
+    /// `userInfo` key: encode the config as the clip's answer (with its read-only fields).
+    public static let encodesAnswer = CodingUserInfoKey(rawValue: "pixelclip.config.answer")!
 
     /// Device defaults from PROTOCOL §3–§4.
     public static let deviceDefaults = ClipConfig(name: "PixelClip", brightness: 160, uploadTimeoutS: 120,
@@ -881,14 +908,45 @@ public struct ClipConfig: Codable, Sendable, Equatable {
         return nil
     }
 
-    /// Non-nil fields of `patch` override `self` (the PUT merge rule).
+    /// Non-nil fields of `patch` override `self` (the PUT merge rule). `apPasswordSet` is the clip's
+    /// own (read-only): a patch never changes it.
     public func merging(_ patch: ClipConfig) -> ClipConfig {
         ClipConfig(name: patch.name ?? name, brightness: patch.brightness ?? brightness,
                    uploadTimeoutS: patch.uploadTimeoutS ?? uploadTimeoutS, apPassword: patch.apPassword ?? apPassword,
                    lowBatteryPct: patch.lowBatteryPct ?? lowBatteryPct,
                    defaultTransition: patch.defaultTransition ?? defaultTransition, tzOffsetS: patch.tzOffsetS ?? tzOffsetS,
                    bleWake: patch.bleWake ?? bleWake, displayDuringUpload: patch.displayDuringUpload ?? displayDuringUpload,
-                   wifiAlwaysOn: patch.wifiAlwaysOn ?? wifiAlwaysOn, orientation: patch.orientation ?? orientation)
+                   wifiAlwaysOn: patch.wifiAlwaysOn ?? wifiAlwaysOn, orientation: patch.orientation ?? orientation,
+                   apPasswordSet: apPasswordSet)
+    }
+}
+
+// MARK: - Firmware update gate
+
+/// `GET /ota`, `POST /ota/ask`: whether a firmware upload is allowed now (the clip's button was pressed
+/// while it asked), whether the clip is asking ("Update? press the button"), and the seconds left in
+/// the current window (asking or allowed). Firmware that predates the gate answers 404.
+public struct OTAState: Codable, Sendable, Equatable {
+    public var ok: Bool
+    public var allowed: Bool
+    public var asking: Bool
+    public var secondsLeft: Int
+
+    enum CodingKeys: String, CodingKey {
+        case ok, allowed, asking
+        case secondsLeft = "seconds_left"
+    }
+
+    public init(allowed: Bool, asking: Bool, secondsLeft: Int) {
+        ok = true; self.allowed = allowed; self.asking = asking; self.secondsLeft = secondsLeft
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ok = try c.decodeIfPresent(Bool.self, forKey: .ok) ?? true
+        allowed = try c.decodeIfPresent(Bool.self, forKey: .allowed) ?? false
+        asking = try c.decodeIfPresent(Bool.self, forKey: .asking) ?? false
+        secondsLeft = try c.decodeIfPresent(Int.self, forKey: .secondsLeft) ?? 0
     }
 }
 
@@ -944,6 +1002,12 @@ public enum ClipJSON {
     public static func encoder() -> JSONEncoder {
         let e = JSONEncoder()
         e.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return e
+    }
+    /// For the clip's own answers (the virtual clip): read-only fields such as `ap_password_set` included.
+    public static func answerEncoder() -> JSONEncoder {
+        let e = encoder()
+        e.userInfo[ClipConfig.encodesAnswer] = true
         return e
     }
     public static func decoder() -> JSONDecoder { JSONDecoder() }

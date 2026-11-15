@@ -100,7 +100,7 @@ final class PolishTests: XCTestCase {
     func testNoProblemCopyLeaksRawErrors() {
         let all: [SendProblem] = [.joinDeclined, .wrongPassword, .clipNotFound, .clipNotAnswering, .lowBatteryEndedSession, .tooLowToWake,
                                   .clipFull(asset: nil), .clipFull(asset: "A"), .assetRejected(asset: nil), .playlistRejected,
-                                  .appTooOld, .other]
+                                  .appTooOld, .other, .clipPasswordReset, .clipPasswordUnknown]
         for p in all {
             XCTAssertFalse(p.title.isEmpty)
             XCTAssertTrue(p.message.hasSuffix("."), p.message)

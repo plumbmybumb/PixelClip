@@ -144,9 +144,23 @@ public final class HTTPClipClient: ClipClient {
         req.setValue(Hashing.sha256Hex(firmware), forHTTPHeaderField: "X-Content-SHA256")
         req.timeoutInterval = 60
         // Never retry an OTA automatically: a half-flashed image is the device's problem to reject.
-        let (body, resp) = try await send(req, upload: firmware, progress: progress, retry: false)
-        try check(resp, body)
+        do {
+            let (body, resp) = try await send(req, upload: firmware, progress: progress, retry: false)
+            try check(resp, body)
+        } catch let error as ClipError where error.isUnreachable {
+            // A clip with the update gate answers `403 press_button` before reading the body and may close
+            // the connection while the image is still going out, which URLSession reports as a dropped
+            // connection. Ask the gate: not allowed means that answer.
+            if let gate = try? await otaState(), !gate.allowed {
+                throw ClipError.http(status: 403, envelope: ErrorEnvelope(error: "press_button", message: "Press the button on the clip to allow the update."))
+            }
+            throw error
+        }
     }
+
+    public func otaState() async throws -> OTAState { try await json(.get, "/ota") }
+
+    public func askOTA() async throws -> OTAState { try await json(.post, "/ota/ask") }
 
     public func endSession() async throws {
         let _: OKResponse = try await json(.post, "/session/end")

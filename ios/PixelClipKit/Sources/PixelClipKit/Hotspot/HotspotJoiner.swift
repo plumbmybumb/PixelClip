@@ -20,10 +20,18 @@ public protocol HotspotConfiguring: Sendable {
     func join(ssidPrefix: String, passphrase: String, remember: Bool) async throws
     /// Remove a remembered network (Settings ▸ Forget Clip).
     func forget(ssidPrefix: String) async
+    /// The clip's passphrase changed since the remembered network was installed: install it again with
+    /// `passphrase` and join. iOS keeps one remembered configuration per network, so the old one goes first.
+    func replaceRemembered(ssidPrefix: String, passphrase: String) async throws
 }
 
 public extension HotspotConfiguring {
     func forget(ssidPrefix: String) async {}
+
+    func replaceRemembered(ssidPrefix: String, passphrase: String) async throws {
+        await forget(ssidPrefix: ssidPrefix)
+        try await join(ssidPrefix: ssidPrefix, passphrase: passphrase, remember: true)
+    }
 }
 
 public enum HotspotJoinError: Error, Equatable, Sendable {
@@ -81,6 +89,24 @@ public struct ImmediateHotspotConfigurator: HotspotConfiguring {
     }
 }
 
+/// The virtual clip's network: joins at once with the passphrase its session uses, and with any other
+/// behaves as iOS does with a wrong WPA2 passphrase (nothing joined, reported like a missing network).
+public struct VirtualHotspotConfigurator: HotspotConfiguring {
+    public let clip: VirtualClipClient
+    public init(clip: VirtualClipClient) { self.clip = clip }
+    public func join(ssidPrefix: String, passphrase: String, remember: Bool) async throws {
+        guard await clip.acceptsJoin(passphrase: passphrase) else { throw HotspotJoinError.unavailable("No network joined.") }
+    }
+}
+
+/// Which passphrase(s) the next join uses, or why it can't be tried (`HotspotPasswords.plan`).
+public enum HotspotPasswordPlan: Equatable, Sendable {
+    /// Try these in order (the first that joins wins).
+    case join([String])
+    /// Don't join: `clipWasReset` or `passwordUnknown`.
+    case blocked(JoinFailure)
+}
+
 /// `notJoined → (waking →) joining → joined`, or `→ unreachable` when the network can't be joined or
 /// the clip doesn't answer `GET /status` after joining. `waking` is the Bluetooth doorbell.
 public enum HotspotState: Equatable, Sendable {
@@ -106,6 +132,12 @@ public enum JoinFailure: Equatable, Sendable {
     case noAnswer
     /// The doorbell said the battery is too low for Wi‑Fi (nothing was joined).
     case lowBattery
+    /// The clip says its passphrase is the factory one again while this iPhone holds its own: it was
+    /// reset on the clip (or it's another clip). Not joined with the factory passphrase until the person
+    /// chooses "Set up again".
+    case clipWasReset
+    /// The clip says it has its own passphrase and this iPhone doesn't know it.
+    case passwordUnknown
 }
 
 @MainActor @Observable
@@ -117,7 +149,21 @@ public final class HotspotJoiner {
     public private(set) var failure: JoinFailure?
 
     public var ssidPrefix: String
+    /// The passphrase of the next join (`passwordPlan`, when set, chooses it at the start of each connect).
     public var passphrase: String
+    /// Asked at the start of each connect: the passphrases to try, or why not to join (nil: `passphrase`).
+    @ObservationIgnored public var passwordPlan: (@MainActor () -> HotspotPasswordPlan)?
+    /// The passphrase the last join went through with (nil: none yet this connect, or the clip was
+    /// already reachable without one).
+    public private(set) var lastJoinPassphrase: String?
+    /// The passphrase the remembered network was installed with, when known (the app keeps it). A
+    /// remembered join with another one replaces the remembered network first. Nil: unknown (installed
+    /// by an older version, or none), taken to match.
+    @ObservationIgnored public var rememberedPassphrase: String?
+    /// The remembered network changed (installed with a passphrase, or removed: nil).
+    @ObservationIgnored public var onRememberedChange: ((String?) -> Void)?
+    /// The passphrases still to try in this connect after `passphrase`.
+    @ObservationIgnored private var alternates: [String] = []
 
     /// Ring the clip over Bluetooth before joining (Settings ▸ Bluetooth Wake). Needs `doorbell`.
     public var bluetoothWake = true
@@ -188,6 +234,7 @@ public final class HotspotJoiner {
         message = nil
         failure = nil
         lastWake = nil
+        if let blocked = beginPlan() { return blockedJoin(blocked) }
         guard bluetoothWake, let doorbell else {
             onWake?(.disabled)
             onJoinStart?()
@@ -284,14 +331,51 @@ public final class HotspotJoiner {
         if state == .joining { return state }
         message = nil
         failure = nil
+        if let blocked = beginPlan() { return blockedJoin(blocked) }
         // Already on the clip's network (e.g. joined from Settings)? Skip the join prompt.
         if probeFirst, await probe() { state = .joined; return state }
         return await joinLoop(window: window)
     }
 
+    /// Takes the plan for this connect: the passphrase and the alternates, or the reason not to join.
+    private func beginPlan() -> JoinFailure? {
+        lastJoinPassphrase = nil
+        alternates = []
+        switch passwordPlan?() ?? .join([passphrase]) {
+        case .blocked(let why):
+            return why
+        case .join(let list):
+            if let first = list.first {
+                passphrase = first
+                alternates = Array(list.dropFirst())
+            }
+            return nil
+        }
+    }
+
+    /// Nothing is rung or joined: the person has to act first (Settings, or "Set up again").
+    private func blockedJoin(_ why: JoinFailure) -> HotspotState {
+        failure = why
+        message = why == .clipWasReset ? "The clip’s Wi‑Fi password was reset." : "This clip has its own Wi‑Fi password."
+        state = .unreachable(message!)
+        return state
+    }
+
     /// Join attempts (retrying "not found" until `window` has passed), then the probes. A cancelled
     /// loop (the wake turned out blocked, or the clip was already reachable) leaves `state` alone.
     private func joinLoop(window: Duration) async -> HotspotState {
+        var result = await joinOnce(window: window)
+        // A wrong WPA2 passphrase looks like a missing network or a silent clip: try the next one.
+        while case .unreachable = result, failure == .notFound || failure == .noAnswer, !alternates.isEmpty, !Task.isCancelled {
+            passphrase = alternates.removeFirst()
+            failure = nil
+            message = nil
+            result = await joinOnce(window: .zero)
+        }
+        return result
+    }
+
+    private func joinOnce(window: Duration) async -> HotspotState {
         state = .joining
         joinAttempts = 0
         let clock = ContinuousClock()
@@ -324,23 +408,37 @@ public final class HotspotJoiner {
         return state
     }
 
-    /// One configurator call: remembered first, join-once if the system refuses that.
+    /// One configurator call: remembered first (installed again when the passphrase changed since),
+    /// join-once if the system refuses that.
     private func attemptJoin() async throws {
         joinAttempts += 1
         let remember = rememberNetwork && !rememberRefused
         do {
-            try await configurator.join(ssidPrefix: ssidPrefix, passphrase: passphrase, remember: remember)
+            if remember, let installed = rememberedPassphrase, installed != passphrase {
+                try await configurator.replaceRemembered(ssidPrefix: ssidPrefix, passphrase: passphrase)
+            } else {
+                try await configurator.join(ssidPrefix: ssidPrefix, passphrase: passphrase, remember: remember)
+            }
             lastJoinRemembered = remember
+            if remember { noteRemembered(passphrase) }
         } catch HotspotJoinError.refused(_) where remember {
             rememberRefused = true
             try await configurator.join(ssidPrefix: ssidPrefix, passphrase: passphrase, remember: false)
             lastJoinRemembered = false
         }
+        lastJoinPassphrase = passphrase
+    }
+
+    private func noteRemembered(_ p: String?) {
+        guard rememberedPassphrase != p else { return }
+        rememberedPassphrase = p
+        onRememberedChange?(p)
     }
 
     /// Settings ▸ Forget Clip: remove the remembered network (iOS asks to join again next time).
     public func forgetNetwork() async {
         await configurator.forget(ssidPrefix: ssidPrefix)
+        noteRemembered(nil)
         lastJoinRemembered = nil
         rememberRefused = false
         markDisconnected()

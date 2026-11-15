@@ -155,6 +155,13 @@ final class Sender {
         Task { await run(job, kind: lastKind) }
     }
 
+    /// The capsule's "Set up again" (the clip's Wi‑Fi password was reset on the clip): forget this iPhone's
+    /// copy, then the send again: it joins with the factory password and gives the clip a new one.
+    func setUpAgain() {
+        session.setUpHotspotPasswordAgain()
+        retryNow()
+    }
+
     /// The capsule's Cancel: stop waiting. The changes stay unsent and go with the next send.
     func cancelPending() {
         sendLog("sender: waiting send cancelled")

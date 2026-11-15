@@ -9,10 +9,14 @@ struct AdvancedSettingsView: View {
     @Environment(ClipSession.self) private var session
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
+    @Environment(Sender.self) private var sender
     @State private var settings = AppSettings.shared
     @State private var name = ""
     @State private var pickFirmware = false
-    @State private var otaProgress: Double?
+    @State private var revealPassword = false
+    @State private var enteringPassword = false
+    @State private var typedPassword = ""
+    @State private var passwordProblem: String?
     @State private var batteryLog: String?
     @State private var loadingLog = false
     @State private var resettingIMU = false
@@ -48,7 +52,7 @@ struct AdvancedSettingsView: View {
             guard case .success(let url) = result else { return }
             let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-            if let data = try? Data(contentsOf: url) { install(data) }
+            if let data = try? Data(contentsOf: url) { session.startFirmwareUpdate(data) }
         }
     }
 
@@ -88,16 +92,19 @@ struct AdvancedSettingsView: View {
     }
 
     private var connectionSection: some View {
-        @Bindable var session = session
-        return Section {
+        Section {
             Toggle("Wake over Bluetooth", isOn: Binding(get: { settings.bluetoothWake },
                                                         set: { v in Task { await session.setBluetoothWake(v) } }))
-            LabeledContent("Hotspot password") {
-                SecureField("Password", text: $session.hotspotPassword)
-                    .multilineTextAlignment(.trailing)
-                    .textContentType(.password)
-                    .accessibilityLabel("Hotspot password")
+            if session.clipPasswordWasReset {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(SendProblem.clipPasswordReset.title).font(.subheadline.weight(.semibold))
+                    Text(SendProblem.clipPasswordReset.message).font(.footnote).foregroundStyle(Z2.secondary)
+                    Button("Set up again") { sender.setUpAgain() }
+                        .accessibilityIdentifier("setUpPasswordAgain")
+                }
+                .padding(.vertical, 2)
             }
+            passwordRows
             Button("Forget the clip’s Wi‑Fi") {
                 Task {
                     await session.forgetClip()
@@ -107,22 +114,92 @@ struct AdvancedSettingsView: View {
         } header: {
             Text("Connection")
         } footer: {
-            Text("The password must match the clip’s (“\(HotspotDefaults.password)” unless it was changed). Forgetting makes iPhone ask to join “\(HotspotDefaults.ssidPrefix)…” again and resets the clock record.")
+            Text(passwordProblem ?? connectionFooter)
         }
+    }
+
+    /// The clip's own Wi‑Fi password: shown on request and copied (for a second iPhone), or typed in
+    /// (one another iPhone set).
+    @ViewBuilder
+    private var passwordRows: some View {
+        if let password = session.passwords.current {
+            LabeledContent("Wi‑Fi password") {
+                HStack(spacing: 14) {
+                    Button { revealPassword.toggle() } label: {
+                        Image(systemName: revealPassword ? "eye.slash" : "eye")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(revealPassword ? "Hide the Wi‑Fi password" : "Show the Wi‑Fi password")
+                    .accessibilityIdentifier("revealPassword")
+                    Button { copy(password) } label: { Image(systemName: "doc.on.doc") }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Copy the Wi‑Fi password")
+                        .accessibilityIdentifier("copyPassword")
+                }
+            }
+            if revealPassword {
+                Text(password)
+                    .font(.body.monospaced())
+                    .textSelection(.enabled)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .accessibilityIdentifier("passwordText")
+            }
+        } else {
+            LabeledContent("Wi‑Fi password", value: session.passwords.pending != nil ? "Being set up" : "Set up at the next Wi‑Fi send")
+        }
+        if enteringPassword {
+            SecureField("Password from another iPhone", text: $typedPassword)
+                .textContentType(.password)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .submitLabel(.done)
+                .onSubmit(saveTypedPassword)
+                .accessibilityIdentifier("typedPassword")
+            HStack {
+                Button("Save", action: saveTypedPassword).buttonStyle(.borderless)
+                Spacer()
+                Button("Cancel") { enteringPassword = false; typedPassword = ""; passwordProblem = nil }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(Z2.secondary)
+            }
+        } else {
+            Button("Enter a Wi‑Fi password…") { enteringPassword = true; passwordProblem = nil }
+                .accessibilityIdentifier("enterPassword")
+        }
+    }
+
+    private var connectionFooter: String {
+        let forget = "Forgetting makes iPhone ask to join “\(HotspotDefaults.ssidPrefix)…” again and resets the clock record."
+        if session.passwords.current != nil {
+            return "Your clip has its own Wi‑Fi password, saved on this iPhone. To send from another iPhone, copy it here and enter it there. \(forget)"
+        }
+        return "The app gives your clip its own Wi‑Fi password the first time it sends over Wi‑Fi. \(forget)"
+    }
+
+    private func saveTypedPassword() {
+        if let problem = session.setHotspotPasswordManually(typedPassword) {
+            passwordProblem = problem
+            return
+        }
+        passwordProblem = nil
+        typedPassword = ""
+        enteringPassword = false
+        router.flash("Wi‑Fi password saved", icon: "lock.fill")
+    }
+
+    private func copy(_ password: String) {
+        // Gone from the clipboard after two minutes (still there long enough to paste on another iPhone).
+        UIPasteboard.general.setItems([[UTType.utf8PlainText.identifier: password]],
+                                      options: [.expirationDate: Date().addingTimeInterval(120)])
+        router.flash("Copied for two minutes", icon: "doc.on.doc")
     }
 
     // MARK: Firmware, logs, raw status
 
     private var maintenanceSection: some View {
         Section {
-            if let p = otaProgress {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(p < 1 ? "Sending the update… \(Int(p * 100))%" : "Installed. The clip is restarting.")
-                    ProgressView(value: p)
-                }
-            } else {
-                Button("Update firmware…") { pickFirmware = true }
-            }
+            firmwareRows
             Button {
                 Task { await loadBatteryLog() }
             } label: {
@@ -151,7 +228,43 @@ struct AdvancedSettingsView: View {
         } header: {
             Text("Firmware and logs")
         } footer: {
-            Text("Firmware files end in .bin; keep the phone close until the clip restarts. The battery log needs the clip’s Wi‑Fi.")
+            Text("Firmware files end in .bin. The clip asks for a press of its button first; keep the phone close until it restarts. The battery log needs the clip’s Wi‑Fi.")
+        }
+    }
+
+    @ViewBuilder
+    private var firmwareRows: some View {
+        switch session.firmwareStep {
+        case .idle:
+            Button("Update firmware…") { pickFirmware = true }
+        case .asking:
+            HStack { Text("Asking the clip…"); Spacer(); ProgressView() }
+        case .waitingForPress(let seconds):
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Press the button on your clip to allow the update")
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityIdentifier("firmwarePressButton")
+                Text("\(seconds) s left").font(.footnote.monospacedDigit()).foregroundStyle(Z2.secondary)
+                    .contentTransition(.numericText())
+            }
+            Button("Cancel", role: .cancel) { session.cancelFirmwareUpdate() }
+                .accessibilityIdentifier("firmwareCancel")
+        case .uploading(let p):
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Sending the update… \(Int(p * 100))%")
+                ProgressView(value: p)
+            }
+        case .installed:
+            Text("Installed. The clip is restarting.")
+            Button("Done") { session.resetFirmwareStep() }
+        case .notPressed:
+            Text("The button wasn’t pressed in time. Nothing was changed on the clip.")
+            Button("Try again") { session.retryFirmwareUpdate() }
+                .accessibilityIdentifier("firmwareTryAgain")
+            Button("Not now", role: .cancel) { session.resetFirmwareStep() }
+        case .failed:
+            Text("The update didn’t go through. Nothing was changed on the clip.")
+            Button("Done") { session.resetFirmwareStep() }
         }
     }
 
@@ -185,6 +298,7 @@ struct AdvancedSettingsView: View {
             if session.useVirtual {
                 Toggle("Simulate Bluetooth unavailable", isOn: $session.simulateBluetoothUnavailable)
                 Button("Add sample items") { Task { await DemoContent.addSamples(to: library) } }
+                Button("Reset the virtual clip’s Wi‑Fi password") { Task { await session.resetVirtualClipPassword() } }
                 Button("Reset the virtual clip", role: .destructive) { Task { await session.resetVirtualClip() } }
             }
         } header: {
@@ -196,14 +310,6 @@ struct AdvancedSettingsView: View {
     #endif
 
     // MARK: Actions
-
-    private func install(_ data: Data) {
-        otaProgress = 0
-        Task {
-            let ok = await session.updateFirmware(data) { p in Task { @MainActor in otaProgress = p } }
-            if ok { otaProgress = 1 } else { otaProgress = nil; router.flash("The update didn’t go through", icon: "exclamationmark.triangle.fill") }
-        }
-    }
 
     private func loadBatteryLog() async {
         loadingLog = true

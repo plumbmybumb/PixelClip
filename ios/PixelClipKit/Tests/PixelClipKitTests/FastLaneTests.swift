@@ -332,7 +332,16 @@ actor CountingClipClient: ClipClient {
     func previous() async throws { hit("POST /prev"); try await inner.previous() }
     func setBrightness(_ value: Int) async throws { hit("POST /brightness"); try await inner.setBrightness(value) }
     func screenshot() async throws -> RGB565Frame { hit("GET /screenshot"); return try await inner.screenshot() }
-    func ota(firmware: Data, progress: ProgressHandler?) async throws { hit("POST /ota"); try await inner.ota(firmware: firmware, progress: progress) }
+    private var beforeOTA: (@Sendable () async -> Void)?
+    /// Tests: runs once before the next `POST /ota` is forwarded.
+    func setBeforeOTA(_ f: (@Sendable () async -> Void)?) { beforeOTA = f }
+    func ota(firmware: Data, progress: ProgressHandler?) async throws {
+        hit("POST /ota")
+        if let f = beforeOTA { beforeOTA = nil; await f() }
+        try await inner.ota(firmware: firmware, progress: progress)
+    }
+    func otaState() async throws -> OTAState { hit("GET /ota"); return try await inner.otaState() }
+    func askOTA() async throws -> OTAState { hit("POST /ota/ask"); return try await inner.askOTA() }
     func endSession() async throws { hit("POST /session/end"); try await inner.endSession() }
     func scenes() async throws -> SceneCatalog { hit("GET /scenes"); return try await inner.scenes() }
     func batteryLog() async throws -> String { hit("GET /batlog"); return try await inner.batteryLog() }

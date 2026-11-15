@@ -33,8 +33,9 @@ struct SendStatusCapsule: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .contentTransition(.numericText())
                     .accessibilityIdentifier("sendStatusTitle")
-                if let detail = Self.detail(stage, waiting: !sender.isSending) {
-                    Text(detail).font(.caption).foregroundStyle(Z2.secondary).lineLimit(2)
+                if let detail = Self.detail(stage, waiting: !sender.isSending, failure: sender.failure) {
+                    Text(detail).font(.caption).foregroundStyle(Z2.secondary).lineLimit(4)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .accessibilityElement(children: .combine)
@@ -101,6 +102,9 @@ struct SendStatusCapsule: View {
             round("xmark", label: "Cancel", id: "sendStatusCancel", hint: "Stops waiting; the changes go with the next send", prominent: false) {
                 sender.cancelPending()
             }
+        case .failed where sender.failure == .clipPasswordReset:
+            pill("Set up again", id: "sendStatusSetUpAgain", hint: "Gives the clip a new Wi‑Fi password, then sends") { sender.setUpAgain() }
+            round("xmark", label: "Close", id: "sendStatusCancel", hint: "Hides this message", prominent: false) { sender.dismissFailure() }
         case .failed:
             round("arrow.clockwise", label: "Retry", id: "sendStatusRetry", hint: "Tries the send again") { sender.retryNow() }
             round("xmark", label: "Close", id: "sendStatusCancel", hint: "Hides this message", prominent: false) { sender.dismissFailure() }
@@ -156,10 +160,11 @@ struct SendStatusCapsule: View {
         }
     }
 
-    static func detail(_ stage: Sender.Stage, waiting: Bool) -> String? {
+    static func detail(_ stage: Sender.Stage, waiting: Bool, failure: SendProblem? = nil) -> String? {
         switch stage {
         case .waiting: "Looking again every 10 s"
         case .looking where waiting: "The send waits for it"
+        case .failed where failure == .clipPasswordReset || failure == .clipPasswordUnknown: failure?.message
         case .failed: "Nothing was changed on the clip"
         default: nil
         }

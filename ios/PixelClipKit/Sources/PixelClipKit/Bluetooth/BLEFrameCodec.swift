@@ -170,7 +170,13 @@ public struct FastLaneRoute: Sendable, Hashable {
         }
     }
 
-    public var isEligible: Bool { !isBulk }
+    /// Small, but only over the clip's Wi‑Fi: `POST /ota/ask` (the firmware answers `413 use_wifi` over Bluetooth).
+    public var isWiFiOnly: Bool {
+        let p = path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? path
+        return method == "POST" && p == "/ota/ask"
+    }
+
+    public var isEligible: Bool { !isBulk && !isWiFiOnly }
 
     /// Safe to send again over Wi‑Fi when a Bluetooth exchange broke off midway (the clip may have
     /// run it): everything but stepping the playlist, capturing a calibration pose and the oracle's

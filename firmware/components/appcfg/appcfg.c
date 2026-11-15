@@ -13,6 +13,9 @@
 static const char *TAG = "config";
 #define CONFIG_FILE "config.json"
 #define CONFIG_MAX_BYTES 4096
+/* The published factory passphrase (PROTOCOL §3): what every clip starts with, and what the button gesture
+ * restores (appcfg_reset_ap_password). */
+#define AP_PASSWORD_DEFAULT "pixelclip-2026"
 
 static appcfg_t s_cfg;
 /* The hotspot passphrase: beside s_cfg, not in it (appcfg.h). Static storage is not part of a core dump
@@ -43,7 +46,7 @@ static void set_defaults(draft_t *d)
     strlcpy(c->name, "PixelClip", sizeof c->name);
     c->brightness = 230;  /* perceptual level; 160 looked dim on the real panel (gamma 2.2 -> raw 92) */
     c->upload_timeout_s = 120;
-    strlcpy(d->ap_password, "pixelclip-2026", sizeof d->ap_password);
+    strlcpy(d->ap_password, AP_PASSWORD_DEFAULT, sizeof d->ap_password);
     c->low_battery_pct = 8;
     c->default_transition = APPCFG_TRANSITION_FADE;
     c->display_during_upload = true;
@@ -162,14 +165,19 @@ static bool apply(draft_t *d, const cJSON *patch, bool stored, int32_t *tz_out, 
     return true;
 }
 
-/* `with_secret`: only the copy written to config.json carries the passphrase; the API view never does. */
+/* `with_secret`: only the copy written to config.json carries the passphrase; the API view never does. It carries
+ * `ap_password_set` instead (is the passphrase still the published default?), which is derived, never stored. */
 static cJSON *to_json_locked(bool with_secret)
 {
     cJSON *o = cJSON_CreateObject();
     cJSON_AddStringToObject(o, "name", s_cfg.name);
     cJSON_AddNumberToObject(o, "brightness", s_cfg.brightness);
     cJSON_AddNumberToObject(o, "upload_timeout_s", s_cfg.upload_timeout_s);
-    if (with_secret) cJSON_AddStringToObject(o, "ap_password", s_ap_password);
+    if (with_secret) {
+        cJSON_AddStringToObject(o, "ap_password", s_ap_password);
+    } else {
+        cJSON_AddBoolToObject(o, "ap_password_set", strcmp(s_ap_password, AP_PASSWORD_DEFAULT) != 0);
+    }
     cJSON_AddNumberToObject(o, "low_battery_pct", s_cfg.low_battery_pct);
     cJSON_AddStringToObject(o, "default_transition",
                             s_cfg.default_transition == APPCFG_TRANSITION_CUT ? "cut" : "fade");
@@ -277,5 +285,21 @@ esp_err_t appcfg_merge_json(const cJSON *patch, char *msg, size_t msg_len)
     wipe(d, sizeof *d);
     xSemaphoreGive(s_mutex);
     if (err == ESP_OK && tz_set) err = timekeeping_set_tz(tz);
+    return err;
+}
+
+esp_err_t appcfg_reset_ap_password(void)
+{
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    /* The old passphrase is overwritten in place; nothing else of the config changes. */
+    wipe(s_ap_password, sizeof s_ap_password);
+    strlcpy(s_ap_password, AP_PASSWORD_DEFAULT, sizeof s_ap_password);
+    const esp_err_t err = save_locked();
+    xSemaphoreGive(s_mutex);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "hotspot passphrase reset, but not saved: %s", esp_err_to_name(err));
+    } else {
+        ESP_LOGW(TAG, "hotspot passphrase reset to the factory default (button gesture)");
+    }
     return err;
 }

@@ -12,11 +12,12 @@ The short version for someone deciding whether to wear one is in the root
 
 - **The parsers are in good shape.** Fuzzing with memory-error detection found no memory corruption in any
   decoder, parser or renderer.
-- **The radio links are open by design, and that is still true.** There is no Bluetooth pairing, every clip
-  starts with the same published hotspot password, and firmware updates are not signed. A stranger in range who
-  knows the default password can open the hotspot over Bluetooth, join it, send content and install firmware.
-  Changing the hotspot password closes most of that; the Bluetooth link itself stays open. These are the items
-  marked **Open** below, and the README says so plainly.
+- **The Bluetooth link is open by design, and that is still true.** There is no pairing, so a stranger in
+  range can rearrange or delete what is stored, change settings, drain the battery and recognise the clip again
+  later. These are the items marked **Open** below, and the README says so plainly.
+- **The two worst outcomes were closed after the audit**, in a way that adds no step to sending: the app now
+  gives each clip its own random hotspot password, and the clip refuses a firmware update unless its button is
+  pressed. See "Built after the audit" below. Both are tested on a computer only.
 - **Everything that could be fixed without changing how the clip is used has been fixed**, including a bug that
   let one small request crash the clip, or crash it on every boot.
 
@@ -64,18 +65,18 @@ Severity is the reviewer's judgement of harm to a wearer: **Critical**, **High**
 
 | Id | Severity | Finding | Status |
 |---|---|---|---|
-| WIFI-1 | Critical | The hotspot password was not a secret: `GET /config` returned it, also over Bluetooth. | **Mitigated.** It is write-only now and kept out of crash dumps. Every clip still starts with the same published default until its owner changes it: **Open.** |
-| WIFI-2 | High | `POST /ota` installs any image; the sender supplies the hash, and nothing is signed or confirmed on the clip. | **Open.** |
+| WIFI-1 | Critical | The hotspot password was not a secret: `GET /config` returned it, also over Bluetooth. | **Mitigated.** It is write-only now and kept out of crash dumps, and the app replaces the published default with a random password at its first send over WiFi. A clip that has never been sent to over WiFi, or is used without the app, still has the default. |
+| WIFI-2 | High | `POST /ota` installs any image; the sender supplies the hash, and nothing is signed or confirmed on the clip. | **Mitigated.** The clip refuses an image unless its button was pressed while it showed "Update?" (`403 press_button`). Images are still not signed. |
 | WIFI-3 | High | Deeply nested JSON overflowed the task stacks: about 200 `[` crashed the clip, and a nested playlist was stored and then crashed it at every boot. | **Fixed.** Nesting is capped at 16, with a build-time check and regression tests. After three early crashes in a row the clip now also sets the stored playlist aside and starts idle. |
 | WIFI-4 | Medium | No `Host`, `Origin` or `Content-Type` checks, so a web page open on the phone could send requests to the clip. | **Fixed.** |
-| WIFI-5 | Medium | A setting change can lock the owner out, and there is no factory-reset gesture. | **Open.** Recovery today is re-flashing over USB with an erase. |
+| WIFI-5 | Medium | A setting change can lock the owner out, and there is no factory-reset gesture. | **Mitigated.** A button gesture puts the hotspot password back to the default without touching the content. Bluetooth switched off through the settings still needs a WiFi session to switch back on; anything else still needs a USB erase. |
 | WIFI-6 | Medium | The access point was thought to still offer the old TKIP cipher. | **Not applicable.** On ESP-IDF 5.5.0 the WiFi library forces CCMP for this mode (checked by disassembly, not on the air). |
 | WIFI-7 | Medium | `firmware/scripts/e2e.sh` built shell and Python code from values the clip returns, so an impostor clip could run commands on a contributor's computer. | **Fixed.** The proof of concept no longer executes. |
 | WIFI-8 | Low | Slow or stalled clients turned into watchdog resets. | **Fixed** (verified by build only). One client can still hold the single station slot. |
 | WIFI-9 | Low | Setting the clock far ahead permanently marks scheduled items as done. | **Open.** The web-page path is closed by WIFI-4. |
 | WIFI-10 | Low | Information exposure: motion sensor over Bluetooth, the password inside crash dumps. | **Fixed** for those two. Battery log and text list stay readable. |
 | WIFI-11 | Low | ESP-IDF 5.5.0's access-point DHCP server has a known out-of-bounds read (CVE-2026-45160). | **Mitigated.** Build release images with ESP-IDF 5.5.5 or later. |
-| WIFI-12 | Low | The phone joins any `PixelClip-…` network that accepts the password it has, so an impostor works while the default is in use. | **Open.** |
+| WIFI-12 | Low | The phone joins any `PixelClip-…` network that accepts the password it has, so an impostor works while the default is in use. | **Mitigated.** After the first setup the phone holds a random password an impostor does not know, and it does not fall back to the default by itself. |
 | WIFI-13 | Info | USB or physical access is complete access. | **Accepted**, and stated in the README. Secure boot and flash encryption burn one-time fuses. |
 | WIFI-14 | Info | Cheap compiler and runtime hardening was off. | **Fixed:** stack protector and stack-end watchpoint are on. Heap poisoning is left off until its RAM cost is measured on a clip. |
 
@@ -98,13 +99,13 @@ vulnerabilities found for it are in decoders the tool does not link.
 
 | Id | Severity | Finding | Status |
 |---|---|---|---|
-| IOS-1 | High | The app joins any network named `PixelClip-…` with the default password and remembers it; it has no way to change the clip's password. | **Open.** |
+| IOS-1 | High | The app joins any network named `PixelClip-…` with the default password and remembers it; it has no way to change the clip's password. | **Mitigated.** The app sets a random password by itself and joins with that. It still joins by name prefix, and uses the default until the first setup. |
 | IOS-2 | Medium | Nothing checks that the device answering is the user's clip, over WiFi or Bluetooth. | **Open.** |
 | IOS-3 | Medium | One shared item could crash the app at every launch. | **Fixed.** Items are claimed before parsing and never read twice. |
 | IOS-4 | Medium | The HTML parser overflowed the stack on deep nesting and had quadratic paths. | **Fixed.** |
 | IOS-5 | Medium | Shared links were fetched with no scheme allowlist, size cap, deadline or retry limit. | **Fixed.** A public name that resolves to a private address is not caught. |
 | IOS-6, IOS-7 | Low | The EPUB size cap trusted the declared size; Markdown import had quadratic patterns. | **Fixed.** |
-| IOS-8 | Low | The hotspot password is stored in UserDefaults, in plain text and in backups. | **Open.** |
+| IOS-8 | Low | The hotspot password is stored in UserDefaults, in plain text and in backups. | **Fixed.** It is in the Keychain; an old stored value is moved once. |
 | IOS-9 | Low | Data at rest: no file protection class, temporary copies never deleted, raw page HTML kept. | **Mitigated.** Protection classes set, temporary copies removed, pages stripped before storing. Photo originals keep their metadata. |
 | IOS-10 | Low | The clip client accepted unbounded responses and followed redirects. | **Fixed.** |
 | IOS-11 | Low | The share extension had no size limits and decoded full images for thumbnails. | **Fixed** (build-verified; the share sheet was not driven in a simulator). |
@@ -131,18 +132,41 @@ with content hashes, the iOS app has no third-party packages, and no script down
 | REL-15 | Low | No vulnerability-reporting route. | **Fixed.** [`SECURITY.md`](../SECURITY.md). |
 | REL-18 | Info | A leftover internal codename in build option names. | **Fixed.** |
 
-## What would close the open items
+## Built after the audit
 
-In order of value:
+Three things were added after the review, chosen because they close the worst outcomes without adding a step to
+an ordinary send:
+
+1. **A private hotspot password per clip.** At its first send over WiFi the app gives the clip a random
+   24-character password, keeps it in the Keychain and shows a note once. The clip reports only whether its
+   password is still the default (`ap_password_set`), never the password. If the clip reports the default again
+   while the phone holds a password, the app stops and asks before using the default, so an imitation clip
+   cannot talk the phone into it silently.
+2. **A button press to accept a firmware update.** `POST /ota` is refused with `403 press_button` unless the
+   clip's button was pressed while it showed "Update?". The permission lasts 120 s, covers one image and ends
+   with the WiFi session.
+3. **A password-reset gesture.** Five quick presses, then a long press while the clip shows "Reset WiFi
+   password?", restore the default password and keep the content.
+
+**How these were checked.** A clean firmware build, host tests of the permission and gesture logic, the
+end-to-end script against the offline mock, and the app's unit, simulator and UI tests against its built-in
+virtual clip. **None of it has run on a real clip or a real phone.** Not known until it does: how the prompts
+look on the panel, whether the presses are comfortable, how iOS behaves when the saved network is installed
+again with the new password (the code removes the saved network and adds it again, which should cost one extra
+"Join" prompt), and the Keychain on a device.
+
+**What these do not change.** A stranger who has not got the password can still do everything listed as Open
+under Bluetooth. Someone who holds the clip can reset its password and allow an update; physical access was
+already full access. A clip is as open as the default password until the app's first send over WiFi.
+
+## What would close the remaining open items
 
 1. **Pair once.** Bluetooth pairing with a six-digit code shown on the clip's screen, opened only by a button
    press, after which every Bluetooth request needs the bonded, encrypted link. Closes BLE-1, -3, -4, -5, -8, -9
    and, with private addresses, BLE-6. In the app: remember the bonded clip and talk only to it (BLE-7, IOS-2).
-2. **A private hotspot password per clip**, set by the app over the paired link and kept in the Keychain. Closes
-   WIFI-1, WIFI-12, IOS-1 and IOS-8.
-3. **A button press on the clip to accept a firmware update.** Closes WIFI-2 for anyone who is not holding the
-   clip.
-4. **A factory-reset gesture** (WIFI-5), needed once the password cannot be read back.
+   The hotspot password could then be set over the paired link at pairing time, instead of at the first send.
+2. **Signed firmware images**, so that a pressed button is not the only thing between a joined client and the
+   firmware (WIFI-2).
 
-None of these has been built. Pairing in particular has to be tried on a real clip with a real phone before it
-can be relied on.
+Neither has been built. Pairing in particular has to be tried on a real clip with a real phone before it can be
+relied on.

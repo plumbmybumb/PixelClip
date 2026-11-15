@@ -54,7 +54,14 @@ Encoder guidance (phone side): emit a repeat run for ≥ 3 identical pixels, lit
 ## 3. WiFi session
 
 - Long-press BOOT (≥ 1.5 s) toggles **upload mode**. On entry the clip shows a splash "WiFi: `<ssid>`" for 3 s, then blanks the display and starts a SoftAP.
-- SSID `PixelClip-XXXX` (ASCII, no accent, so hotspot joining is reliable; XXXX = last 2 MAC bytes, hex upper). WPA2-PSK, default passphrase `pixelclip-2026` (changeable with the `ap_password` config key: write-only, and only over WiFi, see §4 "Config JSON"). Channel 6, max 1 station, TX power capped (≈ 8–11 dBm) to protect the battery.
+- SSID `PixelClip-XXXX` (ASCII, no accent, so hotspot joining is reliable; XXXX = last 2 MAC bytes, hex upper). WPA2-PSK, default passphrase `pixelclip-2026` (changeable with the `ap_password` config key: write-only, and only over WiFi, see §4 "Config JSON"; `ap_password_set` tells whether it was changed). Channel 6, max 1 station, TX power capped (≈ 8–11 dBm) to protect the battery.
+- **Passphrase reset on the clip** (for someone who lost the phone that knew the passphrase): five short presses of BOOT
+  within 3 s open a 10 s window ("Reset WiFi password?" / "hold to confirm"); a long press (1.5–6 s) inside it puts the
+  passphrase back to `pixelclip-2026`, saves it, shows "WiFi password reset" and ends a running session (an always-on
+  hotspot comes back at once, with the default). Inside the window that long press does not open or close the
+  hotspot. The window closes after 10 s or on any other press (that press does nothing else; a 6 s hold still powers
+  off). The five presses keep their usual meaning (next item, ...). Only the passphrase changes: content, playlist and
+  the other settings stay. A client that set its own passphrase sees `ap_password_set:false` on its next connection.
 - IP `192.168.4.1`, DHCP for the phone, mDNS `pixelclip.local`.
 - The AP shuts down and the display returns after `upload_timeout_s` (default 120) with no HTTP request, or immediately on `POST /session/end`, or on another long-press.
 - The phone joins via `NEHotspotConfiguration` (the configuration is remembered, not join-once) and talks plain HTTP. No TLS, no auth beyond WPA2.
@@ -79,7 +86,8 @@ existing BLE link instead of raising the hotspot. The GATT service has two chara
 The device routes the payload through the **same handlers as HTTP** (identical status codes and JSON). Endpoints allowed on the
 fast lane: everything except `PUT /assets/{id}`, `PUT /texts/{id}`, `POST /ota`, `GET /screenshot`, `GET /assets/{id}` and
 `GET /batlog` (bulk transfers stay on WiFi; the device answers `413` for them over BLE). Also WiFi only, because the
-BLE link has no pairing and anyone in range can use it: `GET /coredump`, the development routes `GET /imu`,
+BLE link has no pairing and anyone in range can use it: `GET /coredump`, `POST /ota/ask` (the update prompt on the
+clip's screen; `GET /ota` itself works over BLE), the development routes `GET /imu`,
 `POST /imu/calibrate` and `POST /queue/test`, and a `PUT /config` that carries `ap_password` (the whole request is
 refused, nothing of it is applied). All of these answer `413 {"ok":false,"error":"use_wifi"}` over BLE, which a client
 treats as "send this one over the hotspot". A fast-lane request does not start a
@@ -101,14 +109,16 @@ Base `http://192.168.4.1`. JSON bodies are UTF-8. Every JSON response is an obje
 | GET | `/assets/{id}` | – | raw `.hca` (for debugging / app re-download) |
 | GET | `/playlist` | – | playlist JSON |
 | PUT | `/playlist` | playlist JSON | `{"ok":true}`; unknown asset ids → `422` |
-| GET | `/config` | – | config JSON (never contains `ap_password`) |
-| PUT | `/config` | partial config JSON (merge) | config JSON (never contains `ap_password`); invalid value → `422 invalid_config` |
+| GET | `/config` | – | config JSON (never contains `ap_password`; carries the read-only `ap_password_set`) |
+| PUT | `/config` | partial config JSON (merge) | config JSON (never contains `ap_password`; carries `ap_password_set`); invalid value → `422 invalid_config` |
 | POST | `/time` | `{"epoch":<unix s>,"tz_offset_s":<int>}` | `{"ok":true}` |
 | POST | `/show/{id}` | `{"duration_ms":<optional>}` | `{"ok":true}` — plays `id` now, then resumes playlist |
 | POST | `/next` · `/prev` | – | `{"ok":true}` |
 | POST | `/brightness` | `{"value":0-255}` | `{"ok":true}` (live preview; persist with `/config`) |
 | GET | `/screenshot` | – | raw framebuffer, `Content-Type: application/octet-stream`, 536×240 RGB565BE (257,280 bytes) |
-| POST | `/ota` | raw app image; `X-Content-SHA256` | `{"ok":true}` then reboot after 1 s |
+| POST | `/ota` | raw app image; `X-Content-SHA256` | `{"ok":true}` then reboot after 1 s; `403 press_button` unless updates are allowed (see "Firmware update" below) |
+| GET | `/ota` | – | `{"ok":true,"allowed":<bool>,"asking":<bool>,"seconds_left":<int>}` (also over the BLE fast lane) |
+| POST | `/ota/ask` | – | the clip asks for a button press; answers like `GET /ota` (WiFi only) |
 | POST | `/session/end` | – | `{"ok":true}`; WiFi off within 1 s, display on |
 | PUT/GET/DELETE | `/texts[/{id}]`, `PUT/GET /fonts/{id}`, `POST/GET /reader` | – | Reader mode (see §5c) |
 | GET/DELETE | `/coredump` | – | raw crash dump from flash after a panic (WiFi only; `404` when none); `/status.resets.coredump` flags one |
@@ -136,6 +146,26 @@ while the phone is on the hotspot:
 
 Memory errors: any endpoint may answer `503 {"ok":false,"error":"no_memory"}` when internal RAM is exhausted,
 and bulk uploads `503 low_memory` when fewer than 12 KB are free. Both are **retryable**: the app waits 2 s and retries up to 3 times.
+
+**Firmware update.** Knowing the hotspot passphrase is not enough to install firmware: someone has to press the
+clip's button. States: *idle*, *asking* (60 s) and *allowed* (120 s).
+
+- `GET /ota` → `200 {"ok":true,"allowed":<bool>,"asking":<bool>,"seconds_left":<int>}`; `seconds_left` is what remains
+  of the current asking or allowed window (whole seconds, rounded up), `0` when idle. Works over WiFi and the fast lane.
+- `POST /ota/ask` (no body) starts or restarts the asking window, unless updates are already allowed (then nothing
+  changes), and answers like `GET /ota`. While asking, the clip shows "Update?" / "press the button", in screen-on
+  and panel-off sessions alike (the prompt wakes a sleeping panel). WiFi only: over the fast lane `413 use_wifi`.
+- A short press while asking allows updates for 120 s and shows "Update allowed" briefly. That press does nothing
+  else (no next item, no reader pause, no oracle turn). Other presses keep their meaning: a long press still ends
+  the session, which also ends the permission.
+- `POST /ota` is checked in this order, from the headers, before any body byte is read: no valid `X-Content-SHA256`
+  → `400 missing_sha256`; empty body → `411 empty_body`; updates not allowed →
+  `403 {"ok":false,"error":"press_button","message":"..."}`; then the memory check (`503 low_memory`). The `403` also
+  starts the asking window, so a plain client (curl) gets the prompt and simply sends again after the press.
+- The permission ends when its 120 s run out, when the WiFi session ends, or when an image is accepted (one press,
+  one image). A failed upload (`422 sha256_mismatch`, `422 invalid_image`, a dropped connection) keeps it until it
+  runs out. An app sends `POST /ota/ask`, tells the user to press the button, polls `GET /ota` until `allowed`, then
+  sends the image. Ordinary content sends never involve the button.
 
 `/status`:
 ```json
@@ -210,6 +240,10 @@ Config JSON (all keys optional on PUT):
   with `PUT /config`, and no response of `GET /config` or `PUT /config` ever contains it, on either transport. It can
   only be set over WiFi; over the BLE fast lane a `PUT /config` that carries the key answers `413 use_wifi` (§3b).
   A client keeps its own copy of the passphrase it set.
+- `ap_password_set` (read-only boolean, in every `GET /config` and `PUT /config` answer, on both transports): `true`
+  when the stored passphrase differs from the factory default `pixelclip-2026`, `false` while it is still the default
+  (also after the button reset of §3). It is derived, not stored, and a patch that carries it changes nothing (the
+  key is ignored like any unknown key).
 - `low_battery_pct` is `0`–`20` (the clip switches itself off at that charge; `0` leaves only the fixed 3.40 V floor).
   A larger value is `422 invalid_config`.
 - Ranges of the other keys: `name` 1–64 bytes, `brightness` 0–255, `upload_timeout_s` 30–1800,

@@ -7,7 +7,8 @@
 #   PREV_SSID="My WiFi" scripts/e2e.sh   # rejoin this network at the end (else Wi-Fi is power-cycled
 #                                        # so macOS auto-joins its preferred network)
 #   SKIP_WIFI=1 CLIP=http://127.0.0.1:8080 scripts/e2e.sh   # already joined / mock server: no Wi-Fi juggling
-#   E2E_OTA=1 scripts/e2e.sh       # also POST build/pixelclip.bin to /ota (clip reboots; runs last)
+#   E2E_OTA=1 scripts/e2e.sh       # also POST build/pixelclip.bin to /ota (clip reboots; runs last). The clip
+#                                  # shows "Update?": press its button once when the script asks you to.
 #   E2E_CLEAR_BATLOG=1             # also DELETE /batlog (wipes the discharge log)
 #   KEEP_SESSION=1                 # do not POST /session/end at the end
 #   E2E_CALIB=1                    # interactive IMU bench calibration (prompts you to hold the clip
@@ -532,9 +533,43 @@ expect 200 "config restored" "j['brightness']==int(a[0]) and j['default_transiti
 # validated, but it is never echoed. The body is built by json.dumps: the passphrase is the tester's own input.
 python3 -c 'import json,sys; print(json.dumps({"ap_password": sys.argv[1]}))' "$PASSPHRASE" >"$TMP/pw.json"
 req PUT /config -H 'Content-Type: application/json' --data-binary "@$TMP/pw.json"
-expect 200 "PUT /config ap_password (unchanged value) is accepted over WiFi and not echoed" "j['ok'] is True and 'ap_password' not in j"
+expect 200 "PUT /config ap_password (unchanged value) is accepted over WiFi and not echoed" \
+    "j['ok'] is True and 'ap_password' not in j and a[0] not in json.dumps(j)" "$PASSPHRASE"
 req PUT /config -H 'Content-Type: application/json' -d '{"ap_password":"short"}'
 expect 422 "ap_password shorter than 8 characters -> 422 invalid_config" "j['error']=='invalid_config'"
+# ap_password_set (read-only): false while the passphrase is the factory default. The passphrase this script joined
+# with is the clip's, so the flag must agree with it.
+FACTORY_PASS=pixelclip-2026
+if [ "$PASSPHRASE" = "$FACTORY_PASS" ]; then WANT_SET=False; else WANT_SET=True; fi
+req GET /config
+expect 200 "GET /config: ap_password_set is $WANT_SET (joined with the $([ $WANT_SET = False ] && echo factory || echo own) passphrase), no passphrase" \
+    "j.get('ap_password_set') is (a[0]=='True') and a[1] not in json.dumps(j)" "$WANT_SET" "$PASSPHRASE"
+case "$CLIP" in *127.0.0.1*|*localhost*) CFGMOCK=1 ;; *) CFGMOCK=0 ;; esac
+if [ "$CFGMOCK" = 1 ]; then
+    # Mock only: a real clip would take the new passphrase at its next session, and a run that stopped half way
+    # would leave it locked to this script's test value. Here: factory -> own -> factory, and the flag follows.
+    E2E_PASS="e2e-own-pass-$$"
+    python3 -c 'import json,sys; print(json.dumps({"ap_password": sys.argv[1]}))' "$FACTORY_PASS" >"$TMP/pw0.json"
+    python3 -c 'import json,sys; print(json.dumps({"ap_password": sys.argv[1]}))' "$E2E_PASS" >"$TMP/pw1.json"
+    req PUT /config -H 'Content-Type: application/json' --data-binary "@$TMP/pw0.json"
+    expect 200 "PUT /config ap_password = factory default -> ap_password_set false" \
+        "j.get('ap_password_set') is False and 'ap_password' not in j and a[0] not in json.dumps(j)" "$FACTORY_PASS"
+    req PUT /config -H 'Content-Type: application/json' --data-binary "@$TMP/pw1.json"
+    expect 200 "PUT /config ap_password = an own one -> ap_password_set true, passphrase not in the answer" \
+        "j.get('ap_password_set') is True and 'ap_password' not in j and a[0] not in json.dumps(j)" "$E2E_PASS"
+    req GET /config
+    expect 200 "GET /config: ap_password_set true, passphrase not in the answer" \
+        "j.get('ap_password_set') is True and 'ap_password' not in j and a[0] not in json.dumps(j)" "$E2E_PASS"
+    req PUT /config -H 'Content-Type: application/json' -d '{"ap_password_set":false}'
+    expect 200 "PUT /config {\"ap_password_set\":false} is ignored (read-only)" "j.get('ap_password_set') is True"
+    req GET /config
+    expect 200 "ap_password_set still true after the ignored patch" "j.get('ap_password_set') is True"
+    python3 -c 'import json,sys; print(json.dumps({"ap_password": sys.argv[1]}))' "$PASSPHRASE" >"$TMP/pw.json"
+    req PUT /config -H 'Content-Type: application/json' --data-binary "@$TMP/pw.json"
+    expect 200 "ap_password restored, ap_password_set back to $WANT_SET" "j.get('ap_password_set') is (a[0]=='True')" "$WANT_SET"
+else
+    info "real clip: ap_password_set false -> true -> false is checked against the mock only (no passphrase change here)"
+fi
 # low_battery_pct is 0-20 (was 0-50: at 50 a single request switched the clip off below half charge).
 for v in 21 50 -1; do
     req PUT /config -H 'Content-Type: application/json' -d "{\"low_battery_pct\":$v}"
@@ -2068,6 +2103,60 @@ for id in e2e-strip e2e-strip-raw; do
     req DELETE "/assets/$id"; expect 200 "DELETE /assets/$id (test strip)" "j['ok'] is True"
 done
 
+echo "== firmware update permission (GET /ota, POST /ota/ask, 403 press_button)"
+# PROTOCOL §4 "Firmware update": an image is only taken after a short press on the clip while it asks. The refusal
+# below starts the asking window on a real clip too ("Update?" on its screen for 60 s; the session end clears it).
+case "$CLIP" in *127.0.0.1*|*localhost*) OTAMOCK=1 ;; *) OTAMOCK=0 ;; esac
+OTA_KEYS="set(j)=={'ok','allowed','asking','seconds_left'} and all(isinstance(j[k],bool) for k in ('ok','allowed','asking')) and isinstance(j['seconds_left'],int) and not isinstance(j['seconds_left'],bool)"
+req GET /ota
+expect 200 "GET /ota: ok / allowed / asking / seconds_left" "$OTA_KEYS and not (j['allowed'] and j['asking']) and (j['seconds_left']==0)==(not j['allowed'] and not j['asking'])"
+OTA_WAS_ALLOWED=$(jbool "j['allowed']") || OTA_WAS_ALLOWED=False
+printf 'not a firmware image\n' >"$TMP/fake.bin"
+FAKE_SHA=$(sha "$TMP/fake.bin")
+req POST /ota -H 'Content-Type: application/octet-stream' --data-binary "@$TMP/fake.bin"
+expect 400 "POST /ota without X-Content-SHA256 -> 400 missing_sha256 (checked before the permission)" "j['error']=='missing_sha256'"
+req POST /ota -H "X-Content-SHA256: $FAKE_SHA" -H 'Content-Type: application/octet-stream' --data-binary ''
+expect 411 "POST /ota with an empty body -> 411 empty_body (checked before the permission)" "j['error']=='empty_body'"
+if [ "$OTA_WAS_ALLOWED" = True ]; then
+    info "updates are already allowed on this clip (someone pressed the button): the refusal checks are skipped"
+else
+    req POST /ota -H "X-Content-SHA256: $FAKE_SHA" -H 'Content-Type: application/octet-stream' --data-binary "@$TMP/fake.bin"
+    expect 403 "POST /ota without the button -> 403 press_button" "j['ok'] is False and j['error']=='press_button' and isinstance(j.get('message'),str)"
+    req GET /ota
+    expect 200 "the refused POST /ota started the asking window" "$OTA_KEYS and j['asking'] is True and j['allowed'] is False and 50<=j['seconds_left']<=60"
+fi
+req POST /ota/ask
+expect 200 "POST /ota/ask: asking (or still allowed), same keys as GET /ota" \
+    "$OTA_KEYS and (j['asking'] or j['allowed']) and (j['allowed'] or 58<=j['seconds_left']<=60)"
+if [ "$OTAMOCK" = 1 ]; then
+    # The button, through the mock-only POST /bench/button (the clip has no such route: 404 there).
+    req POST /bench/button
+    expect 200 "mock button press while asking: used, allowed for 120 s" "j['used'] is True and j['allowed'] is True and j['asking'] is False and 115<=j['seconds_left']<=120"
+    req POST /bench/button
+    expect 200 "a second press while allowed is not used (keeps its normal meaning)" "j['used'] is False and j['allowed'] is True"
+    req POST /ota/ask
+    expect 200 "POST /ota/ask while allowed changes nothing" "j['allowed'] is True and j['asking'] is False and 110<=j['seconds_left']<=120"
+    req POST /ota -H "X-Content-SHA256: $(printf '0%.0s' $(seq 1 64))" -H 'Content-Type: application/octet-stream' --data-binary "@$TMP/fake.bin"
+    expect 422 "allowed, wrong hash -> 422 sha256_mismatch" "j['error']=='sha256_mismatch'"
+    req GET /ota
+    expect 200 "a failed upload keeps the permission" "j['allowed'] is True"
+    printf '\351mock image for the e2e\n' >"$TMP/fake-img.bin"
+    req POST /ota -H "X-Content-SHA256: $(sha "$TMP/fake-img.bin")" -H 'Content-Type: application/octet-stream' --data-binary "@$TMP/fake-img.bin"
+    expect 200 "allowed, a valid image -> 200 (the mock installs nothing)" "j['ok'] is True"
+    req GET /ota
+    expect 200 "an accepted image ends the permission" "j['allowed'] is False and j['asking'] is False and j['seconds_left']==0"
+    req POST /bench/button
+    expect 200 "a press while idle is not used" "j['used'] is False and j['allowed'] is False"
+    req POST /ota/ask; req POST /bench/button
+    expect 200 "ask, press: allowed again" "j['allowed'] is True"
+    req POST /session/end
+    expect 200 "POST /session/end" "j['ok'] is True"
+    req GET /ota
+    expect 200 "the session end ends the permission" "j['allowed'] is False and j['asking'] is False"
+else
+    info "real clip: the press itself is checked with E2E_OTA=1 (you press the button when asked)"
+fi
+
 echo "== errors"
 req GET /no-such-endpoint
 expect 404 "unknown path -> 404 JSON" "j['ok'] is False and j['error']=='not_found'"
@@ -2087,8 +2176,26 @@ expect 200 "/status has no eightball key, playlist.current is not eightball:" \
 if [ -n "${E2E_OTA:-}" ]; then
     echo "== OTA (clip reboots afterwards)"
     BIN="$FW/build/pixelclip.bin"
-    req POST /ota -H "X-Content-SHA256: $(sha "$BIN")" -H 'Content-Type: application/octet-stream' --data-binary "@$BIN"
-    expect 200 "POST /ota $(wc -c <"$BIN" | tr -d ' ') B" "j['ok'] is True"
+    # The update needs a short press on the clip while it asks (PROTOCOL §4 "Firmware update").
+    req POST /ota/ask
+    expect 200 "POST /ota/ask" "j['ok'] is True"
+    [ "$OTAMOCK" = 1 ] && req POST /bench/button   # the mock's stand-in for the press
+    req GET /ota
+    if [ "$(jbool "j['allowed']")" != True ]; then
+        echo "   >>> The clip shows \"Update?\": press its button once (a short press). Waiting up to 60 s..."
+        end=$(( $(date +%s) + 62 ))
+        while [ "$(date +%s)" -lt "$end" ]; do
+            sleep 1
+            req GET /ota
+            [ "$CODE" = 200 ] && [ "$(jbool "j['allowed']")" = True ] && break
+        done
+    fi
+    if expect 200 "GET /ota: updates allowed by the button" "j['allowed'] is True"; then
+        req POST /ota -H "X-Content-SHA256: $(sha "$BIN")" -H 'Content-Type: application/octet-stream' --data-binary "@$BIN"
+        expect 200 "POST /ota $(wc -c <"$BIN" | tr -d ' ') B" "j['ok'] is True"
+    else
+        info "no press within 60 s: the update was not sent"
+    fi
     KEEP_SESSION=1
 fi
 

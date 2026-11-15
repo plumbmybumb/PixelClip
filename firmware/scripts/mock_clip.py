@@ -8,7 +8,13 @@ Sec-Fetch-Site other than none / same-origin) is 403 cross_origin; a Host that i
 pixelclip.local) nor this mock's own address is 403 bad_host (no Host at all is served); a JSON body that is not sent
 as application/json is 415 unsupported_media_type; JSON nested deeper than 16 levels is not JSON (400 bad_json).
 Config: GET /config and the PUT /config answer never contain ap_password (it stays settable here, the mock being the
-WiFi side); low_battery_pct is 0-20.
+WiFi side); they carry the read-only ap_password_set (false while the passphrase is the factory default; the key is
+ignored in a PUT); low_battery_pct is 0-20.
+Firmware update (PROTOCOL 4 "Firmware update"): the button permission like the firmware (components/ota/ota_gate.c):
+GET /ota, POST /ota/ask (asking 60 s), POST /ota 403 press_button unless allowed (and that refusal asks), 120 s
+allowed after a press while asking, cleared by an accepted image or POST /session/end. POST /ota checks the hash and
+the ESP image magic byte only, and installs nothing. POST /bench/button (MOCK ONLY: the clip has no such route) is
+one short press of the button: {"ok":true,"used":<the press allowed an update>, ...the GET /ota keys}.
 Core dump: GET/DELETE /coredump answer 404 no_coredump by default; MOCK_COREDUMP=1 starts with a fake 4 KB image
 (/status.resets.coredump true until DELETE /coredump).
 Oracle (PROTOCOL 5f, 5f.2, 5f.6, 5f.7): items are validated like the firmware (id = the reader bundle under /texts with
@@ -32,8 +38,27 @@ assets = {}; playlist = '{"version":1,"items":[]}'
 texts = {}; fonts = {}; progress = {}; reader = {"paused": False}   # Reader mode (PROTOCOL 5c)
 cfg = {"name":"PixelClip","brightness":160,"upload_timeout_s":120,"ap_password":"pixelclip-2026","low_battery_pct":8,"default_transition":"fade","tz_offset_s":0,
        "display_during_upload":True,"wifi_always_on":False,"ble_wake":True,"orientation":"auto"}
-# What the API shows of the config: everything but the hotspot passphrase, which is write-only (PROTOCOL 4).
-def cfg_view(): return dict({k: v for k, v in cfg.items() if k != "ap_password"}, ok=True)
+# What the API shows of the config: everything but the hotspot passphrase, which is write-only (PROTOCOL 4), plus
+# ap_password_set (derived, never stored).
+AP_PASSWORD_DEFAULT = "pixelclip-2026"
+def cfg_view():
+    return dict({k: v for k, v in cfg.items() if k != "ap_password"}, ap_password_set=cfg["ap_password"] != AP_PASSWORD_DEFAULT, ok=True)
+# The update permission (firmware components/ota/ota_gate.c): idle | asking (60 s) | allowed (120 s).
+OTA_ASK_S, OTA_ALLOW_S = 60, 120
+otag = {"state": "idle", "until": 0.0}
+def ota_state():
+    if otag["state"] != "idle" and time.time() >= otag["until"]: otag.update(state="idle", until=0.0)
+    return otag["state"]
+def ota_view():
+    st = ota_state()
+    left = 0 if st == "idle" else int(-(-(otag["until"] - time.time()) // 1))   # whole seconds, rounded up
+    return {"ok": True, "allowed": st == "allowed", "asking": st == "asking", "seconds_left": left}
+def ota_ask():
+    if ota_state() != "allowed": otag.update(state="asking", until=time.time() + OTA_ASK_S)
+def ota_press():
+    if ota_state() != "asking": return False
+    otag.update(state="allowed", until=time.time() + OTA_ALLOW_S); return True
+def ota_clear(): otag.update(state="idle", until=0.0)
 # JSON as the firmware parses it: cJSON built with CJSON_NESTING_LIMIT 16 (firmware/json_limit.cmake). Deeper
 # documents are "not JSON". The depth is counted before parsing (Python's own parser would recurse).
 JSON_NESTING_LIMIT = 16
@@ -54,7 +79,7 @@ def jloads(b):
 # Routes whose body is JSON (the firmware's read_json / PUT /playlist / PUT /fonts): Content-Type must say so.
 def json_route(method, p):
     if method == "PUT": return p in ("/playlist", "/config") or p.startswith("/fonts/")
-    return method == "POST" and p not in ("/ota", "/next", "/prev", "/session/end")
+    return method == "POST" and p not in ("/ota", "/ota/ask", "/next", "/prev", "/session/end", "/bench/button")
 CFG_BOOLS = ("display_during_upload", "wifi_always_on", "ble_wake")
 ORIENTATIONS = ("auto", "normal", "flipped")   # PROTOCOL 4 "Orientation"
 # Mock gravity is fixed (IMU_RAW["rest"], gy ~ 0): auto never flips, so flipped == (mode == "flipped").
@@ -606,6 +631,7 @@ class H(BaseHTTPRequestHandler):
             k = p[8:]; return self.send(200, raw=assets[k], ctype="application/octet-stream") if k in assets else self.err(404,"not_found")
         if p == "/playlist": j = json.loads(playlist); j["ok"]=True; return self.send(200, j)
         if p == "/config": return self.send(200, cfg_view())
+        if p == "/ota": return self.send(200, ota_view())
         if p == "/screenshot":
             # Screen-on session: the live framebuffer, so an animation on screen changes between two
             # screenshots (the mock moves a bar at 10 fps). Panel-off session: the static offscreen render.
@@ -697,6 +723,7 @@ class H(BaseHTTPRequestHandler):
             pw = j.get("ap_password")
             if "ap_password" in j and not (isinstance(pw, str) and 8 <= len(pw) <= 63 and all(" " <= c <= "~" for c in pw)):
                 return self.err(422,"invalid_config")
+            j.pop("ap_password_set", None)          # read-only: ignored in a patch
             cfg.update(j); return self.send(200, cfg_view())
         self.err(404,"not_found")
     def post(self):
@@ -713,7 +740,26 @@ class H(BaseHTTPRequestHandler):
             return self.send(200,{"ok":True}) if 0<=v<=255 else self.err(422,"invalid_brightness")
         if p == "/session/end" and cfg["wifi_always_on"]:
             self.body(); return self.send(200, {"ok":True,"always_on":True,"message":"wifi_always_on: the hotspot stays up"})
+        if p == "/session/end": ota_clear()          # the permission belongs to the session (the mock's session goes on)
         if p in ("/next","/prev","/session/end"): self.body(); queue_state["active"]=None; show["cur"]=None; return self.send(200,{"ok":True})
+        if p == "/ota/ask": self.body(); ota_ask(); return self.send(200, ota_view())
+        if p == "/bench/button":                 # MOCK ONLY (the clip has no such route): one short press of the button
+            self.body(); used = ota_press(); return self.send(200, dict(ota_view(), used=used))
+        if p == "/ota":
+            # firmware h_ota: missing hash 400, empty body 411, then the permission (decided before the body), then the image
+            h = self.headers.get("X-Content-SHA256") or ""
+            n = int(self.headers.get("Content-Length") or 0)
+            if not re.fullmatch(r"[0-9a-fA-F]{64}", h): self.body(); return self.err(400, "missing_sha256")
+            if n == 0: return self.err(411, "empty_body")
+            if ota_state() != "allowed":
+                self.body(); ota_ask()
+                return self.send(403, {"ok":False,"error":"press_button",
+                                       "message":"press the button on the clip (it shows \"Update?\"), then send the update again"})
+            if n > 0x300000: self.body(); return self.err(413, "too_large")
+            d = self.body()
+            if hashlib.sha256(d).hexdigest() != h.lower(): return self.err(422, "sha256_mismatch")   # permission kept
+            if d[:1] != b"\xe9": return self.err(422, "invalid_image")                               # permission kept
+            ota_clear(); return self.send(200, {"ok":True})                                           # (no reboot here)
         if p == "/reader":
             j = self.jbody()
             if j is None: return self.err(400,"bad_json")

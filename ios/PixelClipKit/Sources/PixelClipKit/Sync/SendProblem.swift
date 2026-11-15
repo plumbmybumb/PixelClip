@@ -16,6 +16,11 @@ public enum SendProblem: Equatable, Sendable {
     case lowBatteryEndedSession
     /// The Bluetooth doorbell found the battery too low to turn Wi‑Fi on (nothing was joined).
     case tooLowToWake
+    /// The clip's Wi‑Fi password is the factory one again while this iPhone holds the clip's own: nothing
+    /// is joined until the person taps "Set up again".
+    case clipPasswordReset
+    /// The clip has its own Wi‑Fi password and this iPhone doesn't know it.
+    case clipPasswordUnknown
     /// `413`: the clip has no room for this picture.
     case clipFull(asset: String?)
     /// `422` on an upload: the clip couldn't read this picture.
@@ -36,6 +41,8 @@ public enum SendProblem: Equatable, Sendable {
         case .wrongPassword: self = .wrongPassword
         case .notFound: self = .clipNotFound
         case .lowBattery: self = .tooLowToWake
+        case .clipWasReset: self = .clipPasswordReset
+        case .passwordUnknown: self = .clipPasswordUnknown
         case .noAnswer, nil: self = .clipNotAnswering
         }
     }
@@ -94,6 +101,8 @@ public enum SendProblem: Equatable, Sendable {
         case .clipNotFound: "Can’t find your clip"
         case .clipNotAnswering: "Your clip isn’t answering"
         case .lowBatteryEndedSession, .tooLowToWake: "The battery is too low"
+        case .clipPasswordReset: "Your clip’s Wi‑Fi password was reset"
+        case .clipPasswordUnknown: "This clip has its own Wi‑Fi password"
         case .clipFull: "Your clip is full"
         case .assetRejected: "Your clip couldn’t read a picture"
         case .playlistRejected: "Your clip didn’t accept the playlist"
@@ -107,13 +116,17 @@ public enum SendProblem: Equatable, Sendable {
         case .joinDeclined:
             "When iPhone asks to join the “PixelClip-…” network, tap Join. Then try again."
         case .wrongPassword:
-            "The hotspot password in Settings must match the clip’s. Unless you changed it, it’s “\(HotspotDefaults.password)”."
+            "The Wi‑Fi password in Settings, Advanced must match the clip’s."
         case .clipNotFound:
             "PixelClip didn’t answer. Hold the button on the side of the clip for about two seconds, until it says “WiFi: PixelClip-…”, then try again."
         case .clipNotAnswering:
             "The clip may have turned its Wi‑Fi off. Press and hold its button for about two seconds, then try again."
         case .lowBatteryEndedSession:
             "The clip turned its Wi‑Fi off to save power. Charge it for a few minutes over USB‑C, then send again."
+        case .clipPasswordReset:
+            "If you reset it on the clip, tap Set up again to give it a new one."
+        case .clipPasswordUnknown:
+            "Enter it in Settings, Advanced, or reset it on the clip: press its button five times quickly, then hold."
         case .tooLowToWake:
             "PixelClip answered over Bluetooth but its battery is too low to turn on Wi‑Fi. Charge it for a few minutes over USB‑C, then try again."
         case .clipFull(let name):
@@ -149,6 +162,7 @@ public enum SendProblem: Equatable, Sendable {
         switch self {
         case .joinDeclined, .wrongPassword, .clipNotFound, .clipNotAnswering: "wifi.exclamationmark"
         case .lowBatteryEndedSession, .tooLowToWake: "battery.25percent"
+        case .clipPasswordReset, .clipPasswordUnknown: "lock.trianglebadge.exclamationmark"
         case .clipFull: "externaldrive.badge.exclamationmark"
         case .assetRejected: "photo.badge.exclamationmark"
         case .playlistRejected: "list.bullet.rectangle"

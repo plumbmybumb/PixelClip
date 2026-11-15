@@ -156,32 +156,42 @@ stranger seeing or replacing.
   brightness, orientation, the clock and other settings, and rearrange or delete what is stored on it. They
   cannot read or set the hotspot password over Bluetooth, and pictures, texts and firmware only travel over
   WiFi.
-- **The hotspot password is the only barrier to everything else, and every clip starts with the same published
-  default** (`pixelclip-2026`). Someone who knows it can join the hotspot (and can open it over Bluetooth), then
-  send any content and install any firmware: updates are checked by hash only, not signed. **Change the password
-  before you wear the clip in public.** Join the clip's hotspot from a computer and run:
+- **The hotspot password guards your content, and the app gives your clip its own.** Every clip starts with the
+  same published default (`pixelclip-2026`). The first time the app sends something over WiFi it replaces the
+  default with a random password, keeps it in the iPhone's Keychain and tells you once; there is nothing to
+  type. Someone who knows the password can join the hotspot (and can open it over Bluetooth) and send any
+  content, so until that first send the clip is as open as the default makes it.
+  - *A second phone:* copy the password from Settings ▸ Advanced on the first phone and enter it there on the
+    second.
+  - *Without the app:* join the clip's hotspot from a computer and set one yourself. It takes 8 to 63 printable
+    ASCII characters, applies from the next session, and can never be read back from the clip.
 
-  ```sh
-  curl -X PUT -H 'Content-Type: application/json' \
-       -d '{"ap_password":"your-own-long-passphrase"}' http://192.168.4.1/config
-  ```
+    ```sh
+    curl -X PUT -H 'Content-Type: application/json' \
+         -d '{"ap_password":"your-own-long-passphrase"}' http://192.168.4.1/config
+    ```
 
-  It takes 8 to 63 printable ASCII characters, applies from the next session, and can never be read back from
-  the clip. Then enter the same password in the app under Settings ▸ Advanced ▸ Hotspot password. If you forget
-  it, re-flash the firmware over USB with `ERASE=1 firmware/scripts/flash.sh` (this wipes the clip's content).
+  - *If the password is lost:* press the clip's button five times quickly, then hold it while the clip shows
+    "Reset WiFi password?". The password goes back to the default and everything stored stays. The app then
+    offers to set the clip up again. Anyone holding the clip can do this too.
+- **A firmware update needs a press of the clip's button.** Updates are checked by hash only, not signed, so
+  the clip refuses one unless its button is pressed while it shows "Update?". Someone who has joined the hotspot
+  cannot install firmware without touching the clip.
 - **Traffic is plain HTTP** inside the clip's own WPA2 network. There is no TLS.
 - **The clip can be recognised.** It advertises a fixed Bluetooth address and a name unique to your unit, so
   someone who wants to follow one particular clip from place to place can.
 - **The app trusts what looks like a clip.** It talks to the first device that advertises PixelClip's Bluetooth
-  service and joins networks named `PixelClip-…`. A device imitating a clip nearby could receive what you send.
+  service, so a device imitating a clip nearby could receive the small requests the app sends over Bluetooth.
+  Pictures and texts go over WiFi, and once your clip has its own password the phone no longer joins a network
+  that only knows the default, except in the minutes right after the first setup or if you tap "Set up again".
 - **Physical access is full access.** Anyone holding the clip with a USB cable can read and replace everything
   on it. Secure boot and flash encryption are off on purpose: they burn one-time fuses and can lock a hobbyist
   out of their own board.
 - **Batteries.** A LiPo cell worn on the head needs care: use a protected cell, change the charge resistor before
   charging from the board ([`docs/BUILD.md`](docs/BUILD.md)), and do not charge it unattended.
 
-The review behind this list, with what was fixed and what is still open, is
-[`docs/SECURITY-AUDIT.md`](docs/SECURITY-AUDIT.md). Found a security problem? Please report it privately: see
+The review behind this list, with what was fixed, what is still open and what has only been tested on a
+computer so far, is [`docs/SECURITY-AUDIT.md`](docs/SECURITY-AUDIT.md). Found a security problem? Please report it privately: see
 [`SECURITY.md`](SECURITY.md).
 
 ## Licence and credits

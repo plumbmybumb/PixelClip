@@ -43,8 +43,13 @@ void appcfg_get(appcfg_t *out);
 void appcfg_get_ap_password(char *out, size_t out_len);
 
 /* The config as the API shows it (GET /config, the PUT /config answer; caller deletes). It never contains
- * `ap_password`: the passphrase is write-only on every transport (security audit WIFI-1 / BLE-2). */
+ * `ap_password`: the passphrase is write-only on every transport (security audit WIFI-1 / BLE-2). It carries the
+ * read-only `ap_password_set` (true = the passphrase is no longer the factory default), never stored. */
 cJSON *appcfg_to_json(void);
+
+/* Put the hotspot passphrase back to the factory default and persist it (the button gesture, README "Using the
+ * clip"). Everything else in the config stays. The new passphrase applies from the next session. */
+esp_err_t appcfg_reset_ap_password(void);
 
 /* Validate and merge a partial config object, then persist. On validation failure returns
  * ESP_ERR_INVALID_ARG and writes a human message into `msg`. Unknown keys are ignored. */

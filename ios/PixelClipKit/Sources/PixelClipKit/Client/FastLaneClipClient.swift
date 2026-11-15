@@ -38,7 +38,11 @@ public final class FastLaneClipClient: ClipClient {
 
     public func config() async throws -> ClipConfig { try await json("GET", "/config") }
 
-    public func putConfig(_ patch: ClipConfig) async throws -> ClipConfig { try await json("PUT", "/config", body: patch) }
+    /// A new hotspot passphrase never travels over Bluetooth: Wi‑Fi only, like the firmware's `413 use_wifi`.
+    public func putConfig(_ patch: ClipConfig) async throws -> ClipConfig {
+        if patch.apPassword != nil { throw FastLaneError.needsWiFi }
+        return try await json("PUT", "/config", body: patch)
+    }
 
     public func setTime(_ time: TimeSync) async throws {
         let _: OKResponse = try await json("POST", "/time", body: time)
@@ -59,6 +63,11 @@ public final class FastLaneClipClient: ClipClient {
     public func screenshot() async throws -> RGB565Frame { throw FastLaneError.needsWiFi }
 
     public func ota(firmware: Data, progress: ProgressHandler?) async throws { throw FastLaneError.needsWiFi }
+
+    public func otaState() async throws -> OTAState { try await json("GET", "/ota") }
+
+    /// Wi‑Fi only (the clip answers `413 use_wifi` over Bluetooth).
+    public func askOTA() async throws -> OTAState { throw FastLaneError.needsWiFi }
 
     public func endSession() async throws { let _: OKResponse = try await json("POST", "/session/end") }
 

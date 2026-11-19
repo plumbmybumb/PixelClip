@@ -35,6 +35,9 @@ public protocol ClipClient: Sendable {
     /// `GET /batlog` (optional endpoint; 404 when absent): CSV `t,mv,pct,state,display,brightness`.
     func batteryLog() async throws -> String
     func clearBatteryLog() async throws
+    /// `POST /erase {"confirm":"erase"}` (Wi‑Fi only): every asset, text and font goes and the playlist empties; the
+    /// config, the clock and the motion calibration stay. 404 on firmware that predates it.
+    func eraseContent() async throws -> EraseReport
 
     // Reader mode (PROTOCOL §5c)
     /// `GET /texts`.

@@ -178,6 +178,20 @@ public final class HTTPClipClient: ClipClient {
         let _: OKResponse = try await json(.delete, "/batlog")
     }
 
+    /// Exactly `{"confirm":"erase"}` as JSON. Erasing a full clip takes seconds (up to ~20 s, not measured), so the
+    /// answer gets 60 s. Safe to send again after a dropped connection: a second erase finds the clip empty.
+    public func eraseContent() async throws -> EraseReport {
+        var req = request(.post, "/erase")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = Self.eraseTimeout
+        let (body, resp) = try await send(req, upload: try ClipJSON.encoder().encode(EraseRequest()))
+        try check(resp, body)
+        return try decode(EraseReport.self, body)
+    }
+
+    /// How long `POST /erase` may take to answer.
+    public static let eraseTimeout: TimeInterval = 60
+
     // MARK: Reader (§5c)
 
     public func texts() async throws -> [ClipText] {

@@ -100,6 +100,14 @@ uint32_t reader_progress_get(const char *id);
 esp_err_t reader_progress_set(const char *id, uint32_t word);
 void reader_progress_remove(const char *id);
 
+/* ---- erase ------------------------------------------------------------------------------------ */
+
+/* POST /erase: remove every file of the text and font directories (texts with their indexes, font documents,
+ * leftovers of interrupted writes) and all reading progress. *texts / *fonts = the texts (indexes) and font
+ * documents removed. `tick` (may be NULL) runs after every file (see storage_asset_erase_all). ESP_FAIL when a file
+ * could not be removed (what was removed stays removed; a repeated call removes the rest). */
+esp_err_t reader_erase_all(size_t *texts, size_t *fonts, void (*tick)(void));
+
 #ifdef __cplusplus
 }
 #endif

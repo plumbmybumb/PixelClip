@@ -63,7 +63,7 @@ xcodebuild -project PixelClip.xcodeproj -scheme PixelClip -destination 'platform
 One home screen, four verbs (**Send, Draw, Write, Playlist**), four Extras one tap away, and nothing
 technical on the way (design: [`docs/DESIGN.md`](docs/DESIGN.md)). No tab bar, no
 onboarding, no connect button, no confirmation dialogs: every Send can be undone, removing from the
-playlist is a swipe with a 5-second Undo. Dark-first (ground `#0E0C14`, cards `#1A1726`, accent
+playlist is a swipe with a 5-second Undo (erasing the clip, which can't be undone, asks first). Dark-first (ground `#0E0C14`, cards `#1A1726`, accent
 `#C6A2FF`; light mode keeps the system backgrounds and the `#8445CE` accent), the system font with
 Dynamic Type, press feedback on touch-down everywhere (`Z2Press`), SwiftUI springs (`Z2.spring`),
 reduced motion respected, VoiceOver labels on every icon button.
@@ -81,7 +81,7 @@ reduced motion respected, VoiceOver labels on every icon button.
 | **Extras** (sheets) | `ExtraSheet` + `ExtraLayout`; `ScenesExtra`, `LoopsExtra` (same file), `TarotExtra` + `TarotReadingsView` + `TarotCardEditor` (`ExtraTarot.swift`), `ReaderExtra` | `SceneAnimation`, `StarterStore`, `TarotSettings` / `TarotBundle` / `TarotMaker` (`Model/TarotStore.swift`), `ReaderPlayer`, `ReaderStore` |
 | Re-send | `ResendSheet` (Recent ▸ a thumbnail); long-press a thumbnail ▸ Remove from recents (hidden at once, the library copy goes 5 s later unless the clip or the playlist uses it) | — |
 | **Settings** | `SettingsView`: Clip (brightness, auto-rotate + upside down, battery), If something's off (`CantFindClipSheet` in `HelpViews`, `CalibrationSheet`, Advanced) | `ClipSession` |
-| Advanced | `AdvancedSettingsView`: clip name, screen on while receiving, Wi‑Fi always on / timeout, sleep level, Bluetooth wake, the clip's Wi‑Fi password (show, copy, enter), forget Wi‑Fi, reset the motion sensor, firmware update (asks for the clip's button), battery log + reset, the clip's raw status, About, Debug (virtual clip) | old `SettingsView` internals |
+| Advanced | `AdvancedSettingsView`: clip name, screen on while receiving, Wi‑Fi always on / timeout, sleep level, Bluetooth wake, the clip's Wi‑Fi password (show, copy, enter), forget Wi‑Fi, reset the motion sensor, firmware update (asks for the clip's button), battery log + reset, the clip's raw status, erase everything on the clip (asks first; see Erasing the clip), About, Debug (virtual clip) | old `SettingsView` internals |
 | Share extension | `ShareExtension/`: a photo/GIF/video goes to `MediaInbox` (App Group) and opens in Send's crop screen when PixelClip becomes active (`App/ShareInbox.swift`); a text or link goes to `ReaderInbox` and opens in the Reader extra | `ShareSheetView`, `ReaderStore.importInbox` |
 
 **The Extras.** *Tarot*: see [The Tarot](#the-tarot-oracle-protocol-5f) below. *Scenes*: the five
@@ -291,7 +291,8 @@ details):
 
 `UITests/HomeSmokeTests.swift`: Home → Send (the photo picker, cancelled) → Write → Playlist → Settings →
 back; and an Extra (Scenes ▸ Fire) sent in the background with **Sent** and Undo in the send-status capsule, then Undo;
-and Write's bouncing words to Now and to the playlist.
+and Write's bouncing words to Now and to the playlist; and Settings ▸ Advanced ▸ Erase everything on the clip
+(asked first, the toast, Home with nothing on the clip and nothing to undo, the playlist off, then on again).
 
 ## Under the hood
 
@@ -372,6 +373,20 @@ status line, the Sender's toasts and the playlist.
     button on your clip to allow the update" with the seconds left and Cancel while `GET /ota` is polled once a
     second, then `POST /ota`. 404 (older firmware): the upload at once. `403 press_button` from the upload: the
     same guidance again. The virtual clip models the gate; in the app's virtual mode it presses by itself after 3 s.
+  - **Erasing the clip** (PROTOCOL §4 "Erase"; Settings ▸ Advanced ▸ What's on the clip ▸ **Erase everything on the
+    clip…**). `ClipClient.eraseContent()` is `POST /erase {"confirm":"erase"}` and returns an `EraseReport` (the removed
+    `assets` / `texts` / `fonts` counts and the storage afterwards). It is Wi‑Fi only: `FastLaneRoute.isWiFiOnly`,
+    `FastLaneClipClient` refuses it (`needsWiFi`) and `SmartClipClient` opens the clip's Wi‑Fi for it; the virtual clip
+    (`erase(confirm:)`) answers `400 confirm_required` without the confirmation, `413 use_wifi` over Bluetooth and 404
+    as older firmware, and keeps the config, the clock and the calibration. The app asks first (an alert: what goes,
+    what stays, that it can't be undone), then `Sender.erase()` runs `SyncController(.erase)`: the doorbell + hotspot
+    path from the start (no fast lane), progress in the row and the send-status capsule ("Erasing the clip…"), a toast
+    "The clip is empty. 12.6 MB free." at the end, or the failure with **Try again** (never kept to run later by
+    itself). Afterwards the phone forgets what the clip had (`ClipDocument.forgetClipContent`, `ClipSession.clipWasErased`):
+    Now and its Undo, what was last sent to that clip (`LibraryStore.forgetSent`), the clip's texts and playlist as last
+    read; the playlist switch goes off with its entries kept, so the next send is just that thing and turning the
+    playlist on sends the playlist again. The library, recents, drawings and Reader texts stay; so does the clock record
+    (the clip keeps its clock). Home then shows the clip as empty.
   - **Bluetooth reuse and overlap** (see the doorbell above): the Nearby link is reused, the scan exits on
     the first match, the probe runs alongside the ring and the join starts at the acknowledged write.
   - **No-ops skipped** (`SendSkipRules`, PixelClipKit/Sync): `POST /time` only when the first `/status` says
@@ -534,7 +549,7 @@ Home ▸ ⚙︎ (`SettingsView`), one screen, then Advanced (`AdvancedSettingsVi
 |---|---|---|
 | Clip | Brightness (live) · Auto-rotate (Upside down under it when off) · Battery | on the clip (`PUT /config`, over the fast lane when nothing is open) |
 | If something's off | Can't find the clip? (help sheet) · Sand falls the wrong way (the calibration wizard) · Advanced | — |
-| Advanced | name, screen on while receiving, Wi‑Fi always on, Wi‑Fi timeout, sleep level, Bluetooth wake, hotspot password, forget the clip's Wi‑Fi, Send log, reset the motion sensor, firmware update, battery log (+ reset), the clip's raw status, About, Debug (virtual clip, Debug builds) | on the clip or in UserDefaults |
+| Advanced | name, screen on while receiving, Wi‑Fi always on, Wi‑Fi timeout, sleep level, Bluetooth wake, hotspot password, forget the clip's Wi‑Fi, Send log, reset the motion sensor, firmware update, battery log (+ reset), the clip's raw status, erase everything on the clip, About, Debug (virtual clip, Debug builds) | on the clip or in UserDefaults |
 
 ## Simulator: the virtual clip
 

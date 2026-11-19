@@ -346,6 +346,7 @@ actor CountingClipClient: ClipClient {
     func scenes() async throws -> SceneCatalog { hit("GET /scenes"); return try await inner.scenes() }
     func batteryLog() async throws -> String { hit("GET /batlog"); return try await inner.batteryLog() }
     func clearBatteryLog() async throws { hit("DELETE /batlog"); try await inner.clearBatteryLog() }
+    func eraseContent() async throws -> EraseReport { hit("POST /erase"); return try await inner.eraseContent() }
     func texts() async throws -> [ClipText] { hit("GET /texts"); return try await inner.texts() }
     func putText(id: String, data: Data) async throws -> AssetPutResult { hit("PUT /texts/\(id)"); return try await inner.putText(id: id, data: data) }
     func deleteText(id: String) async throws { hit("DELETE /texts/\(id)"); try await inner.deleteText(id: id) }

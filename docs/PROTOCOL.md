@@ -87,7 +87,7 @@ The device routes the payload through the **same handlers as HTTP** (identical s
 fast lane: everything except `PUT /assets/{id}`, `PUT /texts/{id}`, `POST /ota`, `GET /screenshot`, `GET /assets/{id}` and
 `GET /batlog` (bulk transfers stay on WiFi; the device answers `413` for them over BLE). Also WiFi only, because the
 BLE link has no pairing and anyone in range can use it: `GET /coredump`, `POST /ota/ask` (the update prompt on the
-clip's screen; `GET /ota` itself works over BLE), the development routes `GET /imu`,
+clip's screen; `GET /ota` itself works over BLE), `POST /erase` (it empties the clip), the development routes `GET /imu`,
 `POST /imu/calibrate` and `POST /queue/test`, and a `PUT /config` that carries `ap_password` (the whole request is
 refused, nothing of it is applied). All of these answer `413 {"ok":false,"error":"use_wifi"}` over BLE, which a client
 treats as "send this one over the hotspot". A fast-lane request does not start a
@@ -125,6 +125,7 @@ Base `http://192.168.4.1`. JSON bodies are UTF-8. Every JSON response is an obje
 | GET | `/scenes` | – | supported live scenes and their parameter ranges (see the `scene` item below) |
 | GET | `/batlog` | – | `text/csv` battery log: `epoch,uptime_s,mv,pct,usb,mode,display,brightness` one row per minute, ring-buffered (~64 KB). Optional endpoint; `404` if the firmware lacks it |
 | DELETE | `/batlog` | – | `{"ok":true}` clears the log |
+| POST | `/erase` | `{"confirm":"erase"}` | `{"ok":true,"removed":{"assets":<n>,"texts":<n>,"fonts":<n>},"storage":{"total","used","free"}}`; removes all content (see "Erase" below; WiFi only) |
 
 **Request checks** (HTTP only; the BLE fast lane has no headers). The clip serves no web pages, so a request made by
 a page in a browser is never one of its own clients, and it must not be possible for such a page to drive the clip
@@ -248,6 +249,23 @@ Config JSON (all keys optional on PUT):
   A larger value is `422 invalid_config`.
 - Ranges of the other keys: `name` 1–64 bytes, `brightness` 0–255, `upload_timeout_s` 30–1800,
   `default_transition` `cut | fade`, `tz_offset_s` ±50400.
+
+**Erase.** `POST /erase` with the body `{"confirm":"erase"}` empties the clip so that its whole storage is free for
+new content. Any other body, or none, answers `400 {"ok":false,"error":"confirm_required"}` and changes nothing.
+WiFi only: over the fast lane `413 use_wifi`.
+
+- **Removed**: every asset (pictures, animations, strips, sheets, atlases, decks), every Reader text and font
+  document with the reading positions, and the playlist (`items` and `queue` become empty). Whatever is on screen
+  stops and the clip shows its idle screen, as when it has never been sent anything.
+- **Kept**: the configuration (`/config`: name, brightness, hotspot passphrase and the rest), the clock, the motion
+  calibration, the battery log, a stored crash dump and the firmware. The WiFi session stays open.
+- **Answer**: `200 {"ok":true,"removed":{"assets":<n>,"texts":<n>,"fonts":<n>},"storage":{"total":<bytes>,
+  "used":<bytes>,"free":<bytes>}}` with the counts of what was removed and the storage figures afterwards (the
+  same object as `/status.storage`). Erasing an already empty clip answers the same with zero counts.
+- If something cannot be removed the clip answers `500 {"ok":false,"error":"erase_failed"}`; what was already
+  removed stays removed, and the request can simply be repeated.
+- Afterwards `GET /assets`, `/texts` and `/fonts` list nothing and `GET /playlist` returns the empty playlist. A
+  client must forget what it believed the clip had, so that its next send uploads everything it needs.
 
 ### Orientation
 

@@ -950,6 +950,32 @@ public struct OTAState: Codable, Sendable, Equatable {
     }
 }
 
+// MARK: - Erase
+
+/// `POST /erase` (PROTOCOL §4 "Erase"): what the clip removed and its storage afterwards (the same object as
+/// `/status.storage`). Erasing an already empty clip answers zero counts.
+public struct EraseReport: Codable, Sendable, Equatable {
+    public struct Removed: Codable, Sendable, Equatable {
+        public var assets: Int
+        public var texts: Int
+        public var fonts: Int
+        public init(assets: Int, texts: Int, fonts: Int) { self.assets = assets; self.texts = texts; self.fonts = fonts }
+    }
+
+    public var ok: Bool
+    public var removed: Removed
+    public var storage: ClipStatus.Storage
+
+    public init(removed: Removed, storage: ClipStatus.Storage) { ok = true; self.removed = removed; self.storage = storage }
+}
+
+/// `POST /erase`'s body. Any other body, or none, is `400 confirm_required` and changes nothing.
+public struct EraseRequest: Codable, Sendable, Equatable {
+    public static let confirmation = "erase"
+    public var confirm: String
+    public init(confirm: String = EraseRequest.confirmation) { self.confirm = confirm }
+}
+
 /// `GET /config` returns the config object; firmware may or may not add `"ok":true`, which we ignore.
 public typealias ConfigResponse = ClipConfig
 

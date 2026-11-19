@@ -170,10 +170,11 @@ public struct FastLaneRoute: Sendable, Hashable {
         }
     }
 
-    /// Small, but only over the clip's Wi‑Fi: `POST /ota/ask` (the firmware answers `413 use_wifi` over Bluetooth).
+    /// Small, but only over the clip's Wi‑Fi: `POST /ota/ask` and `POST /erase` (the firmware answers `413 use_wifi`
+    /// over Bluetooth).
     public var isWiFiOnly: Bool {
         let p = path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? path
-        return method == "POST" && p == "/ota/ask"
+        return method == "POST" && (p == "/ota/ask" || p == "/erase")
     }
 
     public var isEligible: Bool { !isBulk && !isWiFiOnly }

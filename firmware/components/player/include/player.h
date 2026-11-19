@@ -90,6 +90,12 @@ void player_set_badge(player_badge_t badge);
  * Blocks until the player has acted (<= 2 s). */
 bool player_release_files(const char *asset_id, const char *text_id);
 
+/* POST /erase, before any file is removed: the player closes whatever it shows, forgets the playlist, the queue, a
+ * pending /show and its cached fonts and decks, and shows the idle screen (offscreen while the panel is off). Nothing
+ * of the stored content is open or referenced afterwards. Blocks until the player has acted (<= 2 s); ESP_ERR_TIMEOUT
+ * when it did not answer (then nothing may be removed). */
+esp_err_t player_forget_content(void);
+
 /* ---- Oracle (PROTOCOL §5f) ---- */
 
 #define PLAYER_ORACLE_READING_MAX 900   /* = ORR_TEXT_MAX (core oracle_reader.h, PROTOCOL §5f.1) */

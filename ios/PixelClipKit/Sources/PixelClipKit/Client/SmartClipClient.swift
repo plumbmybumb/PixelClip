@@ -117,6 +117,8 @@ public final class SmartClipClient: ClipClient {
     public func scenes() async throws -> SceneCatalog { try await route("GET", "/scenes") { try await $0.scenes() } }
     public func batteryLog() async throws -> String { try await route("GET", "/batlog") { try await $0.batteryLog() } }
     public func clearBatteryLog() async throws { try await route("DELETE", "/batlog") { try await $0.clearBatteryLog() } }
+    /// Wi‑Fi only: never the fast lane (`FastLaneRoute.isWiFiOnly`).
+    public func eraseContent() async throws -> EraseReport { try await route("POST", "/erase") { try await $0.eraseContent() } }
     public func texts() async throws -> [ClipText] { try await route("GET", "/texts") { try await $0.texts() } }
 
     public func putText(id: String, data: Data) async throws -> AssetPutResult {

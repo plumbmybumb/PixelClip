@@ -11,6 +11,7 @@ firmware protocol). The implementation map (which view does what) is in [`../REA
 - **Simplicity, not minimalism**: the common path first, advanced things one level deeper (Settings ▸ Advanced).
 - **Forgiveness over confirmation**: Undo after every send (puts back what was on the clip). No confirmation
   dialogs; nothing in the app is destructive (removing from the playlist is a swipe, undoable for 5 s with a toast).
+  The exception is what can't be undone on the clip, which asks first: Settings ▸ Advanced ▸ Erase everything on the clip.
 - **Feedback on touch-down**, continuous during drags, springs (SwiftUI default springs; `damping 1.0`
   feel for UI, slight bounce only after a flick). Sheets open from the thing you tapped and can be dragged
   down at any moment.
@@ -75,7 +76,7 @@ firmware protocol). The implementation map (which view does what) is in [`../REA
 - **If something's off**: "Can't find the clip?" (help sheet: hold the top button to turn it off, tap the bottom
   one to turn it on; keep the phone near; Bluetooth on), "Sand falls the wrong way" (calibration wizard),
   **Advanced** (everything technical: clip name, hotspot password, firmware/version, logs, virtual clip,
-  reset counters, screen during upload, always-on WiFi, the clip's raw status).
+  reset counters, screen during upload, always-on WiFi, the clip's raw status, erase everything on the clip).
 
 ## Gone
 Library tab, Create tab and its six creator cards, Clip tab, Discover (emoji/art/Lottie/space), the item editor

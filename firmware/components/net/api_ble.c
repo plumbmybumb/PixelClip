@@ -4,7 +4,8 @@
  * Runs on the fast-lane worker task of components/ble (never the NimBLE host task). Differences from the
  * HTTP adapter, all by design:
  *   - the body is already in memory (no recv hook) and there are no request headers;
- *   - WiFi-only routes (api_route_t.wifi_only: the bulk transfers, /imu, /imu/calibrate, /queue/test, /ota/ask) are
+ *   - WiFi-only routes (api_route_t.wifi_only: the bulk transfers, /imu, /imu/calibrate, /queue/test, /ota/ask,
+ *     /erase) are
  *     answered 413 {"ok":false,"error":"use_wifi"} without running, and so is a PUT /config that carries
  *     `ap_password` (http_api.c);
  *   - the response is collected into the fast-lane buffer; one larger than PIXELCLIP_BLE_API_MAX_BYTES is

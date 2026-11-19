@@ -64,6 +64,12 @@ final class NowOnClip {
         if case .some(.some(let p)) = previous, p.content.assetID == assetID { setPrevious(nil) }
     }
 
+    /// The clip was erased: nothing is on it, and there is nothing to put back (not undoable).
+    func forgetAll() {
+        store(nil)
+        setPrevious(nil)
+    }
+
     /// Shows this library picture (or anything with the same content).
     func shows(assetID: String) -> Bool { item?.content.assetID == assetID }
 
@@ -163,6 +169,19 @@ enum ClipDocument {
     /// Record a successful PUT of the composed document to the clip with this device id.
     static func markSent(library: LibraryStore, playlist: PlaylistStore = .shared, deviceID: String?) {
         library.markSent(fingerprint: fingerprint(library: library, playlist: playlist), deviceID: deviceID)
+    }
+
+    /// The clip with this device id was erased (`POST /erase`): forget what the phone believed it had, so the next
+    /// send uploads everything it needs. Nothing is on the clip and there is nothing to undo (Now and its previous
+    /// go); the playlist switch goes off (its entries stay), so the next send is just that thing and turning the
+    /// playlist on again sends the playlist; what was last sent to that clip goes; the clip's texts as last read go.
+    /// The library, recents, drawings and Reader texts stay on the phone.
+    static func forgetClipContent(library: LibraryStore, playlist: PlaylistStore = .shared, nowItem: NowOnClip = .shared,
+                                  reader: ReaderStore = .shared, deviceID: String?) {
+        nowItem.forgetAll()
+        playlist.isOn = false
+        library.forgetSent(deviceID: deviceID)
+        reader.recordClipTexts([])
     }
 
     /// The assets a composed playlist needs, as stored on the phone.

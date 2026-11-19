@@ -10,6 +10,8 @@
 #   E2E_OTA=1 scripts/e2e.sh       # also POST build/pixelclip.bin to /ota (clip reboots; runs last). The clip
 #                                  # shows "Update?": press its button once when the script asks you to.
 #   E2E_CLEAR_BATLOG=1             # also DELETE /batlog (wipes the discharge log)
+#   E2E_ERASE=1                    # also POST /erase {"confirm":"erase"}: removes EVERYTHING stored on the clip
+#                                  # (the owner's content too), then re-uploads the fixtures. Always on against the mock.
 #   KEEP_SESSION=1                 # do not POST /session/end at the end
 #   E2E_CALIB=1                    # interactive IMU bench calibration (prompts you to hold the clip
 #                                  # upright, then face up); stores the axis map on the clip. Against the
@@ -36,7 +38,9 @@
 # five lean screens, a detail screen per card with a brief, hold; the paragraph in /status.oracle.reading on three /
 # hold), POST /oracle/draw|turn|back with full forward / backward walks, a bundle without briefs, the idle timeout
 # (hold_ms), default timers, /show borrow, deletes that remove the item, 404/409/422 cases). The removed Magic 8 Ball stays gone (eightball items 422, no route, no status key). Crash diagnostics: a core dump (GET /coredump) is saved to
-# firmware/e2e_coredump.bin and never deleted. Each assertion prints PASS/FAIL; the exit status is non-zero if any failed.
+# firmware/e2e_coredump.bin and never deleted. Erase: POST /erase refusals (400 confirm_required, nothing removed);
+# the erase itself (counts, empty lists, storage, config kept, sending again) against the mock or with E2E_ERASE=1.
+# Each assertion prints PASS/FAIL; the exit status is non-zero if any failed.
 set -uo pipefail
 
 FW="$(cd "$(dirname "$0")/.." && pwd)"
@@ -2172,6 +2176,93 @@ expect 404 "POST /eightball/shake (removed) -> 404 not_found" "j['ok'] is False 
 req GET /status
 expect 200 "/status has no eightball key, playlist.current is not eightball:" \
     "'eightball' not in j and not str(j['playlist']['current']).startswith('eightball:')"
+
+echo "== erase (PROTOCOL §4 \"Erase\": POST /erase empties the clip)"
+# The refusals run everywhere. The erase itself removes everything stored on the clip, the owner's own content
+# included, so on a real clip it only runs with E2E_ERASE=1; against the mock it always runs. Afterwards the
+# fixtures and the playlist of this script are uploaded again (what the rest of the script expects).
+case "$CLIP" in *127.0.0.1*|*localhost*) ERASE=1 ;; *) ERASE=$([ -n "${E2E_ERASE:-}" ] && echo 1 || echo 0) ;; esac
+req GET /assets; N_ASSETS=$(jint "len(j['assets'])") || N_ASSETS=-1
+req GET /texts;  N_TEXTS=$(jint "len(j['texts'])") || N_TEXTS=-1
+req GET /fonts;  N_FONTS=$(jint "len(j['fonts'])") || N_FONTS=-1
+req GET /config; CFG_BEFORE=$(jjson "{k: v for k, v in j.items() if k != 'ok'}") || CFG_BEFORE=null
+req GET /status; USED_BEFORE=$(jint "j['storage']['used']") || USED_BEFORE=-1
+info "before the erase: $N_ASSETS asset(s), $N_TEXTS text(s), $N_FONTS font(s), $USED_BEFORE B used"
+req POST /erase
+expect 400 "POST /erase without a body -> 400 confirm_required" "j['ok'] is False and j['error']=='confirm_required'"
+req POST /erase -H "$JH" -d '{}'
+expect 400 "POST /erase {} -> 400 confirm_required" "j['error']=='confirm_required'"
+req POST /erase -H "$JH" -d '{"confirm":"yes"}'
+expect 400 "POST /erase {\"confirm\":\"yes\"} -> 400 confirm_required" "j['error']=='confirm_required'"
+req POST /erase -H "$JH" -d '{"confirm":"erase","also":1}'
+expect 400 "POST /erase with another key -> 400 confirm_required" "j['error']=='confirm_required'"
+req POST /erase -H "$JH" -d '"erase"'
+expect 400 "POST /erase with a JSON string -> 400 confirm_required" "j['error']=='confirm_required'"
+req POST /erase -H "$JH" -d 'confirm=erase'
+expect 400 "POST /erase with a body that is not JSON -> 400 confirm_required" "j['error']=='confirm_required'"
+req POST /erase -H 'Content-Type: text/plain' -d '{"confirm":"erase"}'
+expect 415 "POST /erase as text/plain -> 415 (request checks)" "j['error']=='unsupported_media_type'"
+req GET /assets
+expect 200 "the refused requests removed no asset" "len(j['assets'])==int(a[0])" "$N_ASSETS"
+req GET /texts
+expect 200 "... no text" "len(j['texts'])==int(a[0])" "$N_TEXTS"
+req GET /fonts
+expect 200 "... no font" "len(j['fonts'])==int(a[0])" "$N_FONTS"
+req GET /playlist
+expect 200 "... and kept the playlist" "[i['type'] for i in j['items']]==['asset','asset','scene']"
+info "over the BLE fast lane POST /erase answers 413 use_wifi (route table; on a clip: scripts/ble_api.py POST /erase '{\"confirm\":\"erase\"}')"
+if [ "$ERASE" = 1 ]; then
+    # something of every kind first: reader atlases, a font, a text with a reading position, a reader item, a queue entry
+    for id in rsvp-dot-a rsvp-dotc-w rsvp-dotc-a; do put_asset "$id" "$FIX/$id.hca"; done
+    req PUT /fonts/e2e-erase-font -H "$JH" --data-binary "@$FIX/rsvp-font.json"
+    expect 201 "PUT /fonts/e2e-erase-font (before the erase)" "j['ok'] is True"
+    req PUT /texts/e2e-erase-text -H "X-Content-SHA256: $(sha "$FIX/rsvp-sample.txt")" -H 'Content-Type: text/plain' --data-binary "@$FIX/rsvp-sample.txt"
+    expect 201 "PUT /texts/e2e-erase-text (before the erase)" "j['ok'] is True"
+    ER_AT=$(( $(date +%s) + 7200 ))
+    req PUT /playlist -H "$JH" -d "{\"version\":1,\"items\":[{\"type\":\"reader\",\"text\":\"e2e-erase-text\",\"font\":\"e2e-erase-font\",\"wpm\":120,\"from_word\":20},{\"type\":\"asset\",\"id\":\"gradient\",\"duration_ms\":8000}],\"queue\":[{\"id\":\"e2e-erase-q\",\"at\":$ER_AT,\"type\":\"asset\",\"asset\":\"anim12\",\"duration_ms\":5000}]}"
+    expect 200 "PUT /playlist with a reader item (from_word 20) and a queue entry (before the erase)" "j['ok'] is True"
+    req GET /texts
+    expect 200 "the text has a reading position" "[t['progress_word'] for t in j['texts'] if t['id']=='e2e-erase-text'][0]>0"
+    req GET /assets; N_ASSETS=$(jint "len(j['assets'])") || N_ASSETS=-1
+    req GET /texts;  N_TEXTS=$(jint "len(j['texts'])") || N_TEXTS=-1
+    req GET /fonts;  N_FONTS=$(jint "len(j['fonts'])") || N_FONTS=-1
+    req GET /status; USED_BEFORE=$(jint "j['storage']['used']") || USED_BEFORE=-1
+    info "erasing: $N_ASSETS asset(s), $N_TEXTS text(s), $N_FONTS font(s), $USED_BEFORE B used"
+    req POST /erase -H "$JH" -d '{"confirm":"erase"}'
+    expect 200 "POST /erase {\"confirm\":\"erase\"}: removed counts = what was stored" \
+        "j['ok'] is True and j['removed']=={'assets':int(a[0]),'texts':int(a[1]),'fonts':int(a[2])} and set(j['storage'])=={'total','used','free'} and j['storage']['total']>0 and j['storage']['free']==j['storage']['total']-j['storage']['used'] and j['storage']['used']<int(a[3])" \
+        "$N_ASSETS" "$N_TEXTS" "$N_FONTS" "$USED_BEFORE"
+    req GET /assets; expect 200 "GET /assets is empty" "j['assets']==[]"
+    req GET /texts;  expect 200 "GET /texts is empty" "j['texts']==[]"
+    req GET /fonts;  expect 200 "GET /fonts is empty" "j['fonts']==[]"
+    req GET /playlist
+    expect 200 "GET /playlist is the empty playlist" "j['items']==[] and j.get('queue',[])==[]"
+    req GET /status
+    expect 200 "/status: storage used went down, nothing playing, no queue, no oracle" \
+        "j['storage']['used']<int(a[0]) and j['playlist']['count']==0 and j['playlist']['current'] is None and j['queue']['pending']==0 and j['queue']['active'] is None and j['oracle']['state']=='waits' and j['oracle']['cards']==0" \
+        "$USED_BEFORE"
+    req GET /reader
+    expect 200 "GET /reader: no reading" "j['active'] is False"
+    req GET /config
+    expect 200 "the config is unchanged" "{k: v for k, v in j.items() if k != 'ok'}==json.loads(a[0])" "$CFG_BEFORE"
+    req POST /erase -H "$JH" -d '{"confirm":"erase"}'
+    expect 200 "POST /erase on an empty clip -> 200 with zero counts" "j['ok'] is True and j['removed']=={'assets':0,'texts':0,'fonts':0}"
+    # content can be sent and played again: the fixtures and this script's playlist (what the remainder expects)
+    for id in gradient anim12 rsvp-dot-w; do
+        put_asset "$id" "$FIX/$id.hca"
+        expect 201 "PUT /assets/$id again after the erase (201, not 409)" "j['ok'] is True and j['id']=='$id'"
+    done
+    req PUT /texts/e2e-erase-text -H "X-Content-SHA256: $(sha "$FIX/rsvp-sample.txt")" -H 'Content-Type: text/plain' --data-binary "@$FIX/rsvp-sample.txt"
+    expect 201 "PUT /texts/e2e-erase-text again: stored anew, its reading position forgotten" "j['ok'] is True and j['progress_word']==0"
+    req DELETE /texts/e2e-erase-text
+    expect 200 "DELETE /texts/e2e-erase-text" "j['ok'] is True"
+    req PUT /playlist -H "$JH" -d "$PL"
+    expect 200 "PUT /playlist (gradient + anim12 + sand) after the erase" "j['ok'] is True"
+    poll_status "j['playlist']['count']==3 and j['playlist']['current'] in ('gradient','anim12','scene:sand')" 5
+    expect 200 "the clip plays the new playlist" "j['playlist']['count']==3 and j['playlist']['current'] in ('gradient','anim12','scene:sand')"
+else
+    info "real clip: the erase itself runs only with E2E_ERASE=1 (it removes everything stored on the clip)"
+fi
 
 if [ -n "${E2E_OTA:-}" ]; then
     echo "== OTA (clip reboots afterwards)"

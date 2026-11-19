@@ -77,6 +77,9 @@ public final class FastLaneClipClient: ClipClient {
 
     public func clearBatteryLog() async throws { let _: OKResponse = try await json("DELETE", "/batlog") }
 
+    /// Wi‑Fi only (the clip answers `413 use_wifi` over Bluetooth).
+    public func eraseContent() async throws -> EraseReport { throw FastLaneError.needsWiFi }
+
     // MARK: Reader (§5c)
 
     public func texts() async throws -> [ClipText] {

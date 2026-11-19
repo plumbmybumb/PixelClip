@@ -14,17 +14,29 @@ enum SyncRequest: Identifiable, Hashable {
     /// `fromWord` when set (this send only), else where the clip stopped; otherwise it joins
     /// the playlist (`PlaylistStore.upsertReading`).
     case reader(String, readNow: Bool, fromWord: Int?)
+    /// Empty the clip (`POST /erase`, PROTOCOL §4 "Erase"), then forget what the phone believed it had
+    /// (`ClipDocument.forgetClipContent`), so the next send uploads everything it needs.
+    case erase
 
     var id: String {
         switch self {
         case .playlist: "playlist"
         case .show(let id): "show-\(id)"
         case .reader(let id, let now, let w): "reader-\(id)-\(now)-\(w ?? -1)"
+        case .erase: "erase"
         }
     }
 
-    /// Sends the composed playlist (everything but "Show now").
-    var sendsPlaylist: Bool { if case .show = self { false } else { true } }
+    /// Sends the composed playlist (everything but "Show now" and the erase).
+    var sendsPlaylist: Bool {
+        switch self {
+        case .show, .erase: false
+        case .playlist, .reader: true
+        }
+    }
+
+    /// Only over the clip's Wi‑Fi (the fast lane refuses it, PROTOCOL §3b): the doorbell + hotspot path from the start.
+    var needsWiFi: Bool { self == .erase }
 }
 
 /// Drives the sync sheet: Bluetooth (the fast lane, or the doorbell) → join →
@@ -77,6 +89,8 @@ final class SyncController {
     /// What went wrong, in words a person can act on (nil while things go well).
     private(set) var problem: SendProblem?
     private(set) var report: SyncReport?
+    /// What an erase removed and the clip's storage afterwards.
+    private(set) var eraseReport: EraseReport?
     /// Step the clip to the next rotation entry once the playlist is on it (the playlist was just switched on:
     /// what was on screen is its first entry, and would start its minute over). Sent while the link this send used
     /// is still open: after the sheet closes, the Wi‑Fi session ends in the background, and a step sent then races
@@ -107,6 +121,7 @@ final class SyncController {
         wifiProblem = nil
         for p in Phase.allCases { steps[p] = .pending }
         uploadFraction = 0; overall = 0; finished = false; problem = nil; report = nil; closeRequested = false
+        eraseReport = nil
         uploadCount = nil
     }
 
@@ -143,12 +158,14 @@ final class SyncController {
             case .playlist: "Send pictures and set the clock"
             case .reader: "Send the text and set the clock"
             case .show: "Send it"
+            case .erase: "Erase everything on the clip"
             }
         case .playlist:
             switch request {
             case .playlist: "Update the playlist"
             case .reader: readsNow ? "Start reading" : "Add it to tonight’s rotation"
             case .show: "Show it for a minute"
+            case .erase: "Empty the playlist on the clip"
             }
         case .finish: "Finish"
         }
@@ -198,7 +215,7 @@ final class SyncController {
         wakesOverBluetooth = settings.bluetoothWake
         session.joiner.bluetoothWake = wakesOverBluetooth
         usesFastLane = false
-        if wakesOverBluetooth && !session.isConnected {
+        if wakesOverBluetooth && !session.isConnected && !request.needsWiFi {
             usesFastLane = true
             steps[.bluetooth] = .active("Looking for it nearby…")
             timeline.start(.bluetooth)
@@ -258,6 +275,8 @@ final class SyncController {
                                   setTime: SendSkipRules.needsTimeSync(status: status, readAt: statusReadAt, lastSyncedAt: session.lastClockSync))
         case .show(let id):
             await runShow(id: id, engine: engine, library: library, session: session)
+        case .erase:
+            await runErase(session: session, library: library)
         }
         finished = true
     }
@@ -546,6 +565,31 @@ final class SyncController {
         }
         overall = 1
         steps[.finish] = .done("Look at your clip")
+        closeAndEndInBackground(session: session, refreshTexts: false)
+    }
+
+    /// `POST /erase` over the clip's Wi‑Fi, then the phone forgets what it believed the clip had: what was last sent
+    /// to it, Now and its Undo, the playlist switch (off, its entries kept), the clip's texts and playlist as last read.
+    private func runErase(session: ClipSession, library: LibraryStore) async {
+        steps[.upload] = .active("Erasing everything on the clip…")
+        timeline.start(.upload)
+        do {
+            let r = try await session.client.eraseContent()
+            timeline.end(.upload)
+            eraseReport = r
+            sendLog("send: erased · \(r.removed.assets) pictures, \(r.removed.texts) texts, \(r.removed.fonts) typefaces removed · \(r.storage.free.byteString) free")
+            ClipDocument.forgetClipContent(library: library, deviceID: session.status?.device.id)
+            session.clipWasErased(r)
+        } catch {
+            fail(.upload, SendProblem(error: error, step: "erase", batteryWasLow: session.batteryWasLow))
+            if problem?.needsButtonPress == true || problem == .lowBatteryEndedSession { session.markSessionEnded() }
+            for p in [Phase.playlist, .finish] { steps[p] = .failed("Skipped") }
+            return
+        }
+        overall = 1
+        steps[.upload] = .done("Erased · \(eraseReport?.storage.free.byteString ?? "–") free")
+        steps[.playlist] = .done("Nothing on the clip now")
+        steps[.finish] = .done("The clip is empty")
         closeAndEndInBackground(session: session, refreshTexts: false)
     }
 

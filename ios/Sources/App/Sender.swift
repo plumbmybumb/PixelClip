@@ -17,6 +17,9 @@ final class Sender {
         case playlist
         /// Read a saved text now (its typeface and text first).
         case reader(docID: String)
+        /// Empty the clip (Settings ▸ Advanced), over its Wi‑Fi. Never kept to run later by itself: out of reach
+        /// is a failure with Retry.
+        case erase
     }
 
     /// What the toast says when the job is done.
@@ -46,6 +49,10 @@ final class Sender {
     /// The last attempt hit a problem that isn't "out of reach" (shown until dismissed or retried).
     private(set) var failure: SendProblem?
     @ObservationIgnored private var lastKind: Kind = .quiet
+    /// The failure shown is an erase's (its Retry erases again).
+    private(set) var eraseFailed = false
+    /// What the last erase removed and the clip's storage afterwards.
+    private(set) var lastErase: EraseReport?
     /// How often a waiting send looks for the clip.
     static let lookEvery: Duration = .seconds(10)
     /// How long "Sent" (with Undo) stays in the capsule.
@@ -59,6 +66,7 @@ final class Sender {
         /// Pictures going up: `index` of `total`, `fraction` of all of them.
         case uploading(index: Int, total: Int, fraction: Double)
         case sending
+        case erasing
         case sent(Kind)
         /// Out of reach: kept, looked for every 10 s.
         case waiting
@@ -76,6 +84,7 @@ final class Sender {
     /// A running send's stage, from its rows.
     static func stage(of c: SyncController) -> Stage {
         func active(_ p: SyncController.Phase) -> String? { if case .active(let s)? = c.steps[p] { s } else { nil } }
+        if c.request == .erase, active(.upload) != nil || active(.finish) != nil { return .erasing }
         if active(.upload) != nil, let u = c.uploadCount { return .uploading(index: u.index, total: u.total, fraction: c.uploadFraction) }
         if active(.upload) != nil || active(.playlist) != nil || active(.finish) != nil || active(.font) != nil {
             return .sending
@@ -115,6 +124,13 @@ final class Sender {
     /// Reads a saved text on the clip now.
     func read(docID: String) { send(.reader(docID: docID), kind: .sent) }
 
+    /// Settings ▸ Advanced ▸ Erase everything on the clip (asked first there): wakes the clip and joins its Wi‑Fi like
+    /// any send with pictures, erases it, and the phone forgets what the clip had. Ends with a toast naming the free space.
+    func erase() { send(.erase, kind: .quiet) }
+
+    /// An erase is running.
+    var isErasing: Bool { isSending && controller?.request == .erase }
+
     /// The Playlist screen's switch. Now plays first in the rotation (`PlaylistStore`), so turning the
     /// playlist on would leave what's on the clip there for the rest of its minute, and every off/on
     /// starts that minute over: once the document is on the clip, the clip is stepped to the next entry (`POST /next`)
@@ -136,6 +152,7 @@ final class Sender {
 
     func send(_ job: Job, kind: Kind) {
         failure = nil
+        eraseFailed = false
         if isSending {
             // Latest wins: the composed document is always the current one.
             sendLog("sender: \(job) queued behind the running send")
@@ -149,8 +166,9 @@ final class Sender {
     /// The capsule's Retry: a full attempt now (doorbell, join), whether or not a look heard the clip.
     func retryNow() {
         guard !isSending else { return }
-        let job = pending ?? .playlist
+        let job = pending ?? (eraseFailed ? .erase : .playlist)
         failure = nil
+        eraseFailed = false
         sendLog("sender: retry now (\(job))")
         Task { await run(job, kind: lastKind) }
     }
@@ -191,11 +209,18 @@ final class Sender {
             failure = nil
             retryTask?.cancel()
             retryTask = nil
-            sentKind = kind
-            sentAt = Date()
-            Task { [weak self] in
-                try? await Task.sleep(for: .seconds(Self.sentShows + 0.2))
-                self?.expireSent()
+            if job == .erase {
+                // Nothing to undo: the toast says it, with the room it freed.
+                sentAt = nil
+                router.flash(lastErase.map { "The clip is empty. \($0.storage.free.byteString) free." } ?? "The clip is empty.",
+                             icon: "checkmark.circle.fill")
+            } else {
+                sentKind = kind
+                sentAt = Date()
+                Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(Self.sentShows + 0.2))
+                    self?.expireSent()
+                }
             }
         case .away:
             sendLog("sender: \(job) couldn’t reach the clip after \(took) s · waiting, looking every \(Int(Self.lookEvery.components.seconds)) s")
@@ -204,6 +229,7 @@ final class Sender {
         case .problem(let p):
             sendLog("sender: \(job) failed after \(took) s · \(p.title)")
             failure = p
+            eraseFailed = job == .erase
         }
         if let next = queued {
             queued = nil
@@ -220,7 +246,7 @@ final class Sender {
     /// The capsule's "Sent" was dismissed (or Undo tapped).
     func dismissSent() { sentAt = nil }
 
-    func dismissFailure() { failure = nil }
+    func dismissFailure() { failure = nil; eraseFailed = false }
 
     private enum Outcome { case sent, away, problem(SendProblem) }
 
@@ -239,6 +265,16 @@ final class Sender {
             defer { controller = nil }
             await c.run(session: session, library: library)
             return outcome(succeeded: c.succeeded, problem: c.problem)
+        case .erase:
+            let c = SyncController(request: .erase)
+            controller = c
+            defer { controller = nil }
+            await c.run(session: session, library: library)
+            if c.succeeded {
+                lastErase = c.eraseReport
+                return .sent
+            }
+            return .problem(c.problem ?? .clipNotAnswering)
         }
     }
 

@@ -712,6 +712,53 @@ storage_status_t storage_asset_delete(const char *id)
     return i >= 0 ? STORAGE_OK : STORAGE_ERR_NOT_FOUND;
 }
 
+storage_status_t storage_asset_erase_all(size_t *removed, void (*tick)(void))
+{
+    *removed = 0;
+    bool failed = false;
+    lock();
+    /* Removing entries while a LittleFS directory is being read can make readdir skip one: read it again until a
+     * pass finds nothing left to remove (or only files that refuse to go). */
+    bool settled = false;
+    for (int pass = 0; pass < 4 && !settled; pass++) {
+        DIR *d = opendir(ASSET_DIR);
+        if (!d) {
+            failed = true;
+            break;
+        }
+        size_t gone = 0;
+        failed = false;
+        struct dirent *e;
+        char path[16 + sizeof ASSET_DIR + sizeof e->d_name];
+        while ((e = readdir(d)) != NULL) {
+            if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0) continue;
+            snprintf(path, sizeof path, ASSET_DIR "/%s", e->d_name);
+            if (unlink(path) != 0) {
+                ESP_LOGE(TAG, "erase: cannot remove %s", e->d_name);
+                failed = true;
+                continue;
+            }
+            gone++;
+            const size_t n = strlen(e->d_name);
+            if (n > 4 && n - 4 <= STORAGE_ID_MAX && strcmp(e->d_name + n - 4, ".hca") == 0) {
+                char id[STORAGE_ID_MAX + 1];
+                memcpy(id, e->d_name, n - 4);
+                id[n - 4] = '\0';
+                index_remove_locked(id);
+                if (storage_id_valid(id)) (*removed)++;
+            }
+            if (tick) tick();
+        }
+        closedir(d);
+        settled = gone == 0;
+    }
+    if (!settled) failed = true;
+    if (!failed) s_count = 0;   /* nothing is left on flash: an entry not indexed this boot is gone as well */
+    unlock();
+    ESP_LOGI(TAG, "erase: %u asset(s) removed%s", (unsigned)*removed, failed ? ", some files could not be removed" : "");
+    return failed ? STORAGE_ERR_IO : STORAGE_OK;
+}
+
 /* ---------- small files ---------- */
 
 esp_err_t storage_read_file(const char *name, char **out, size_t *len, size_t max_len)

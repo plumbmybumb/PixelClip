@@ -1409,6 +1409,83 @@ static esp_err_t h_reader_post(api_req_t *req)
     return send_json(req, ST_200, reader_json());
 }
 
+/* ------------------------------------------------------------------ erase (PROTOCOL §4 "Erase") */
+
+/* Root files that hold content: the playlist (with its write leftover and the copy a safe start set aside) and the
+ * queue's done-set. config.json, the battery log and everything outside LittleFS stay. */
+static const char *const s_erase_files[] = {
+    "playlist.json", "playlist.json.tmp", "playlist.bad.json", "queue-done.json", "queue-done.json.tmp",
+};
+
+/* Runs after every file removed: a full clip is hundreds of files, so the httpd liveness source keeps beating and
+ * IDLE (task watchdog) gets the CPU now and then. */
+static void erase_tick(void)
+{
+    static unsigned n;
+    health_beat(HEALTH_SRC_HTTPD);
+    if ((++n & 7) == 0) vTaskDelay(1);
+}
+
+/* POST /erase {"confirm":"erase"}: every asset, text, font, reading position and the playlist go; config, clock,
+ * motion calibration, battery log, core dump and firmware stay, and so does the session. The player lets go of
+ * everything first (no open file can be removed, and nothing may point at a removed one). Then the playlist and
+ * queue state, the texts and fonts that reference assets, and the assets last: each step is safe to cut by a power
+ * loss (the next boot indexes whatever is left; a playlist naming a missing file plays nothing of it) and a repeated
+ * request finishes the job. WiFi only (route table). */
+static esp_err_t h_erase(api_req_t *req)
+{
+    if (!json_type_ok(req)) return ESP_OK;
+    /* `{"confirm":"erase"}` and nothing else; a larger body is not read (the adapter drains it) */
+    bool confirmed = false;
+    if (req->content_len > 0 && req->content_len <= 64) {
+        const char *buf;
+        size_t len;
+        if (read_body(req, 64, &buf, &len) != ESP_OK) return ESP_OK;   /* the error has been sent */
+        cJSON *j = cJSON_ParseWithLength(buf, len);
+        const cJSON *c = cJSON_GetObjectItemCaseSensitive(j, "confirm");
+        confirmed = cJSON_IsObject(j) && cJSON_GetArraySize(j) == 1 && cJSON_IsString(c) && strcmp(c->valuestring, "erase") == 0;
+        cJSON_Delete(j);
+    }
+    if (!confirmed) return send_error(req, ST_400, "confirm_required", "send {\"confirm\":\"erase\"} to erase the clip");
+
+    const int64_t t0 = esp_timer_get_time();
+    if (player_forget_content() != ESP_OK) {
+        return send_error(req, ST_500, "erase_failed", "the player did not answer: nothing was removed, try again");
+    }
+    bool ok = true;
+    for (size_t i = 0; i < sizeof s_erase_files / sizeof s_erase_files[0]; i++) {
+        storage_remove_file(s_erase_files[i]);
+        if (storage_file_size(s_erase_files[i]) >= 0) {
+            ESP_LOGE(TAG, "erase: cannot remove %s", s_erase_files[i]);
+            ok = false;
+        }
+    }
+    size_t texts = 0, fonts = 0, assets = 0;
+    if (reader_erase_all(&texts, &fonts, erase_tick) != ESP_OK) ok = false;
+    if (storage_asset_erase_all(&assets, erase_tick) != STORAGE_OK) ok = false;
+    health_beat(HEALTH_SRC_HTTPD);
+    net_touch();
+    ESP_LOGI(TAG, "erase: %u asset(s), %u text(s), %u font(s) in %lld ms%s", (unsigned)assets, (unsigned)texts,
+             (unsigned)fonts, (long long)((esp_timer_get_time() - t0) / 1000), ok ? "" : ", incomplete");
+    if (!ok) {
+        player_reload();   /* back in step with whatever is left on flash */
+        return send_error(req, ST_500, "erase_failed", "some content could not be removed: send the request again");
+    }
+    size_t total, used;
+    storage_usage(&total, &used);
+    cJSON *o = cJSON_CreateObject();
+    cJSON_AddBoolToObject(o, "ok", true);
+    cJSON *rm = cJSON_AddObjectToObject(o, "removed");
+    cJSON_AddNumberToObject(rm, "assets", assets);
+    cJSON_AddNumberToObject(rm, "texts", texts);
+    cJSON_AddNumberToObject(rm, "fonts", fonts);
+    cJSON *st = cJSON_AddObjectToObject(o, "storage");
+    cJSON_AddNumberToObject(st, "total", total);
+    cJSON_AddNumberToObject(st, "used", used);
+    cJSON_AddNumberToObject(st, "free", total > used ? total - used : 0);
+    return send_json(req, ST_200, o);
+}
+
 #if CONFIG_PIXELCLIP_BENCH_ROUTES
 /* Bench builds only (health.h): POST /bench/crash {"kind":...}, POST /bench/wedge {"mode":...}. */
 static esp_err_t bench_fault(api_req_t *req, bool crash)
@@ -1456,7 +1533,8 @@ esp_err_t api_bad_method(api_req_t *req)
  * that the unpaired BLE link must not offer (security audits WIFI-10 / BLE-9): GET /imu (the wearer's head
  * motion), POST /imu/calibrate (replaces or erases the stored axis map) and POST /queue/test. The app only
  * calls /imu and /imu/calibrate after it has joined the hotspot (its calibration wizard connects first).
- * POST /ota/ask is WiFi only as well: someone in BLE range must not be able to put "Update?" on the screen. */
+ * POST /ota/ask is WiFi only as well: someone in BLE range must not be able to put "Update?" on the screen, and so is
+ * POST /erase: the unpaired link must not be able to empty the clip. */
 const api_route_t api_routes[] = {
     { "/status",        HTTP_GET,    h_status,        false },
     { "/assets",        HTTP_GET,    h_assets_list,   false },
@@ -1499,6 +1577,7 @@ const api_route_t api_routes[] = {
     { "/reader",        HTTP_GET,    h_reader_get,    false },
     { "/reader",        HTTP_POST,   h_reader_post,   false },
     { "/ble",           HTTP_GET,    h_ble,           false },
+    { "/erase",         HTTP_POST,   h_erase,         true  },   /* empties the clip: WiFi only */
 #if CONFIG_PIXELCLIP_BENCH_ROUTES
     { "/bench/crash",   HTTP_POST,   h_bench_crash,   false },   /* bench builds only (health.h) */
     { "/bench/wedge",   HTTP_POST,   h_bench_wedge,   false },

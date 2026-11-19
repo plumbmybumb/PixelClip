@@ -33,7 +33,7 @@ struct SendStatusCapsule: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .contentTransition(.numericText())
                     .accessibilityIdentifier("sendStatusTitle")
-                if let detail = Self.detail(stage, waiting: !sender.isSending, failure: sender.failure) {
+                if let detail = Self.detail(stage, waiting: !sender.isSending, failure: sender.failure, erase: sender.eraseFailed) {
                     Text(detail).font(.caption).foregroundStyle(Z2.secondary).lineLimit(4)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -57,7 +57,7 @@ struct SendStatusCapsule: View {
     @ViewBuilder
     private func icon(_ stage: Sender.Stage) -> some View {
         switch stage {
-        case .looking, .waking, .connecting, .sending:
+        case .looking, .waking, .connecting, .sending, .erasing:
             if reduceMotion {
                 Image(systemName: "ellipsis.circle").foregroundStyle(Color.accentColor)
             } else {
@@ -153,6 +153,7 @@ struct SendStatusCapsule: View {
         case .connecting: "Connecting…"
         case .uploading(let i, let n, let f): "Sending \(i) of \(n) · \(Int((f * 100).rounded()))%"
         case .sending: "Sending…"
+        case .erasing: "Erasing the clip…"
         case .sent(.playlist): "Added to the playlist"
         case .sent: "Sent"
         case .waiting: "Can’t reach the clip — will retry"
@@ -160,11 +161,12 @@ struct SendStatusCapsule: View {
         }
     }
 
-    static func detail(_ stage: Sender.Stage, waiting: Bool, failure: SendProblem? = nil) -> String? {
+    static func detail(_ stage: Sender.Stage, waiting: Bool, failure: SendProblem? = nil, erase: Bool = false) -> String? {
         switch stage {
         case .waiting: "Looking again every 10 s"
         case .looking where waiting: "The send waits for it"
         case .failed where failure == .clipPasswordReset || failure == .clipPasswordUnknown: failure?.message
+        case .failed where erase: "Try again to finish erasing the clip"
         case .failed: "Nothing was changed on the clip"
         default: nil
         }

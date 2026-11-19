@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -543,4 +544,73 @@ void reader_progress_remove(const char *id)
         prog_save_locked();
     }
     unlock();
+}
+
+/* ------------------------------------------------------------------ erase */
+
+/* Remove the files of `dir` ending in `first` (counted in *count when their id is valid), then every other file.
+ * Texts lose their index before their text, as in reader_text_delete: a text cut short by a power loss is no longer
+ * listed, and its leftover goes with the next erase. LittleFS can skip an entry when one is removed during readdir, so
+ * each round reads the directory again until a pass finds nothing left. False when a file refused to go. */
+static bool empty_dir(const char *dir, const char *first, size_t *count, void (*tick)(void))
+{
+    bool ok = true;
+    const size_t fl = strlen(first);
+    for (int round = 0; round < 2; round++) {   /* 0: the `first` files, 1: the rest */
+        bool settled = false, round_ok = true;
+        for (int pass = 0; pass < 4 && !settled; pass++) {
+            DIR *d = opendir(dir);
+            if (!d) return false;
+            size_t gone = 0;
+            round_ok = true;
+            struct dirent *e;
+            char path[64 + sizeof e->d_name];
+            while ((e = readdir(d)) != NULL) {
+                if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0) continue;
+                const size_t l = strlen(e->d_name);
+                const bool is_first = l > fl && strcmp(e->d_name + l - fl, first) == 0;
+                if (round == 0 && !is_first) continue;
+                snprintf(path, sizeof path, "%s/%s", dir, e->d_name);
+                if (unlink(path) != 0) {
+                    ESP_LOGE(TAG, "erase: cannot remove %s", path);
+                    round_ok = false;
+                    continue;
+                }
+                gone++;
+                if (is_first && l - fl <= STORAGE_ID_MAX) {
+                    char id[STORAGE_ID_MAX + 1];
+                    memcpy(id, e->d_name, l - fl);
+                    id[l - fl] = '\0';
+                    if (storage_id_valid(id)) (*count)++;
+                }
+                if (tick) tick();
+            }
+            closedir(d);
+            settled = gone == 0;
+        }
+        ok = ok && settled && round_ok;
+    }
+    return ok;
+}
+
+esp_err_t reader_erase_all(size_t *texts, size_t *fonts, void (*tick)(void))
+{
+    *texts = *fonts = 0;
+    lock();
+    bool ok = empty_dir(TEXT_DIR, ".idx", texts, tick);
+    ok = empty_dir(FONT_DIR, ".json", fonts, tick) && ok;
+    /* the reading positions: the cache first, so nothing writes the file back */
+    s_prog_n = 0;
+    s_prog_loaded = s_prog != NULL;
+    static const char *const prog_files[2] = { STORAGE_ROOT "/" PROGRESS_FILE, STORAGE_ROOT "/" PROGRESS_FILE ".tmp" };
+    for (int i = 0; i < 2; i++) {
+        if (unlink(prog_files[i]) != 0 && errno != ENOENT) {
+            ESP_LOGE(TAG, "erase: cannot remove %s", prog_files[i]);
+            ok = false;
+        }
+    }
+    unlock();
+    ESP_LOGI(TAG, "erase: %u text(s), %u font(s) removed%s", (unsigned)*texts, (unsigned)*fonts,
+             ok ? "" : ", some files could not be removed");
+    return ok ? ESP_OK : ESP_FAIL;
 }

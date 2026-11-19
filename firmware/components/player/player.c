@@ -77,7 +77,7 @@ _Static_assert(PLAYER_ORACLE_READING_MAX == ORR_TEXT_MAX, "player.h reading size
 typedef enum {
     CMD_NEXT, CMD_PREV, CMD_SHOW_ASSET, CMD_RELOAD, CMD_BRIGHTNESS,
     CMD_OUTPUT, CMD_REFRESH, CMD_QUEUE_TEST, CMD_TIME, CMD_READER, CMD_BADGE, CMD_RELEASE,
-    CMD_ORIENT, CMD_SHOW_ITEM, CMD_ORACLE,
+    CMD_ORIENT, CMD_SHOW_ITEM, CMD_ORACLE, CMD_FORGET,
 } cmd_type_t;
 
 typedef struct {
@@ -2798,6 +2798,26 @@ static bool release_files(const char *id, bool text)
     return hit;
 }
 
+/* CMD_FORGET (POST /erase): let go of every stored file and of everything that names stored content, and show the
+ * idle screen. The playlist is emptied here in RAM, not re-read: the caller removes the files only after this, and
+ * nothing may reopen one meanwhile (with an empty playlist and no override there is nothing to start). */
+static void forget_content(void)
+{
+    s_deferred_n = 0;            /* deferred commands (a /show, a press) would reopen files */
+    s_frozen = s_reload_frozen = false;
+    s_frozen_until_us = 0;
+    s_pending_show = false;
+    close_current();             /* a reading saves its position here: erased with the rest */
+    s_cur.override = false;
+    s_rd.held_text[0] = s_rd.paused_text[0] = '\0';
+    reader_font_unload();
+    s_pl->count = s_pl->queue_count = 0;
+    sched_reload();              /* empty queue: the done-set is forgotten as well */
+    s_index = -1;
+    show_idle();
+    ESP_LOGI(TAG, "content erased: idle");
+}
+
 /* POST /show of a strip: the scroll it was given, else the first playlist item (then queue entry)
  * showing that asset with a scroll, else the default scroll. Without any, a shown strip would be a
  * still of its first 536 px (PROTOCOL §4 says so for playlist items without `scroll`). */
@@ -3154,6 +3174,10 @@ static void handle(const cmd_t *c)
     case CMD_RELEASE:
         s_rd_result = release_files(c->id, c->value != 0) ? ESP_OK : ESP_ERR_NOT_FOUND;
         break;
+    case CMD_FORGET:
+        forget_content();
+        s_rd_result = ESP_OK;
+        break;
     case CMD_BRIGHTNESS:
         s_brightness = (uint8_t)c->value;
         if (s_output && s_cur.kind != CUR_NONE) display_set_brightness(s_brightness);
@@ -3441,6 +3465,12 @@ bool player_release_files(const char *asset_id, const char *text_id)
         hit |= post_sync(&c) == ESP_OK;
     }
     return hit;
+}
+
+esp_err_t player_forget_content(void)
+{
+    cmd_t c = { .type = CMD_FORGET };
+    return post_sync(&c);
 }
 
 void player_set_badge(player_badge_t badge) { post(CMD_BADGE, NULL, (uint32_t)badge); }

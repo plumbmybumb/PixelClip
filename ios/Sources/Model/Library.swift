@@ -360,6 +360,14 @@ final class LibraryStore {
         save()
     }
 
+    /// The clip with this device id was erased: it was sent nothing (nor, by the fallback, was whichever clip had
+    /// the last send).
+    func forgetSent(deviceID: String?) {
+        lastSentFingerprint = nil
+        if let deviceID { sentFingerprints[deviceID] = nil }
+        save()
+    }
+
     /// Clips whose last send is remembered (an id is the clip's to claim, so the list is bounded).
     static let clipsRemembered = 16
 

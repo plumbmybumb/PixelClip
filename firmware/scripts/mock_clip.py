@@ -17,6 +17,8 @@ the ESP image magic byte only, and installs nothing. POST /bench/button (MOCK ON
 one short press of the button: {"ok":true,"used":<the press allowed an update>, ...the GET /ota keys}.
 Core dump: GET/DELETE /coredump answer 404 no_coredump by default; MOCK_COREDUMP=1 starts with a fake 4 KB image
 (/status.resets.coredump true until DELETE /coredump).
+Erase (PROTOCOL 4 "Erase"): POST /erase {"confirm":"erase"} empties assets, texts, fonts, reading positions, the
+playlist and the queue state (anything else: 400 confirm_required); /status.storage.used follows the stored content.
 Oracle (PROTOCOL 5f, 5f.2, 5f.6, 5f.7): items are validated like the firmware (id = the reader bundle under /texts with
 a [prompt] line and a card.<i>.reading line per card, "font" required, "font_big" optional, the deck atlas (108x206,
 5f.12), the optional keys atlas (160x34, 5f.12), frame counts, cards 3..78; "mode", "daily", "pages", "notes" ignored); the state machine follows core/oracle.c with its
@@ -528,6 +530,11 @@ def current_item():
     if qa: return qa
     shown = show_item() or rotation()[1]
     return queue_tick(shown) or shown
+def storage_view():
+    """/status.storage and the POST /erase answer: a 10 MB store whose use follows the stored content"""
+    used = 1000 + sum(len(d) for d in assets.values()) + sum(len(t["data"]) for t in texts.values()) \
+           + sum(len(json.dumps(f)) for f in fonts.values())
+    return {"total": 10000000, "used": used, "free": 10000000 - used}
 def reader_json():
     it = current_item()
     if not it or it.get("type") != "reader" or it.get("text") not in texts:
@@ -601,7 +608,7 @@ class H(BaseHTTPRequestHandler):
             return self.send(200, {"ok":True,"device":{"name":cfg["name"],"id":"a1b2","fw":"0.1.0","hw":"ws-amoled-1.91","protocol":1},
               "battery":{"mv":3900,"pct":66,"charging":False,"usb_present":False},
               "power":{"usb_hold":False,"light_sleeps":0,"light_sleeps_while_usb":0,"awake_violations":0},
-              "orientation":{"mode":cfg["orientation"],"flipped":orient_flipped()},"storage":{"total":10000000,"used":1000,"free":9999000},
+              "orientation":{"mode":cfg["orientation"],"flipped":orient_flipped()},"storage":storage_view(),
               "playlist":{"count":len(items),"index":idx,"current":cur},"time":{"epoch":now() if clock["synced"] or clock["approx"] else 5,"tz_offset_s":cfg["tz_offset_s"],"synced":clock["synced"],
                 "approximate":clock["approx"] and not clock["synced"],
                 "anchor_age_s":int(time.time() - clock["anchor_t"]) if clock["approx"] and not clock["synced"] else None},
@@ -743,6 +750,20 @@ class H(BaseHTTPRequestHandler):
         if p == "/session/end": ota_clear()          # the permission belongs to the session (the mock's session goes on)
         if p in ("/next","/prev","/session/end"): self.body(); queue_state["active"]=None; show["cur"]=None; return self.send(200,{"ok":True})
         if p == "/ota/ask": self.body(); ota_ask(); return self.send(200, ota_view())
+        if p == "/erase":
+            # PROTOCOL 4 "Erase" (firmware h_erase): exactly {"confirm":"erase"}, else 400 confirm_required and nothing
+            # changes; then every asset, text, font and reading position, the playlist and the queue state go, whatever
+            # is on screen stops (idle). Config, clock, IMU calibration, core dump and the session stay.
+            b = self.body()
+            try: j = jloads(b) if 0 < len(b) <= 64 else None
+            except Exception: j = None
+            if j != {"confirm": "erase"}: return self.err(400, "confirm_required")
+            removed = {"assets": len(assets), "texts": len(texts), "fonts": len(fonts)}
+            assets.clear(); texts.clear(); fonts.clear(); progress.clear(); reader["paused"] = False
+            global playlist
+            playlist = '{"version":1,"items":[]}'; playlist_t0["t"] = time.time(); rot.update(cur=None, since=time.time())
+            show["cur"] = None; queue_state.update(done=set(), active=None); orc.clear(); orc["key"] = None
+            return self.send(200, {"ok": True, "removed": removed, "storage": storage_view()})
         if p == "/bench/button":                 # MOCK ONLY (the clip has no such route): one short press of the button
             self.body(); used = ota_press(); return self.send(200, dict(ota_view(), used=used))
         if p == "/ota":

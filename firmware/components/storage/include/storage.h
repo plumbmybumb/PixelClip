@@ -71,6 +71,13 @@ void storage_asset_write_abort(storage_writer_t *w);
 
 storage_status_t storage_asset_delete(const char *id);
 
+/* POST /erase: remove every file of the asset directory (assets, their sidecars, leftovers of interrupted uploads)
+ * and drop them from the index. *removed = the assets (.hca files) removed. `tick` (may be NULL) runs after every
+ * file: an erase of a full store takes a while and the caller keeps its liveness beats going from it. Assets go one
+ * by one, so after a power cut the next boot indexes whatever is left and a repeated call removes the rest.
+ * STORAGE_ERR_IO when a file could not be removed (what was removed stays removed). */
+storage_status_t storage_asset_erase_all(size_t *removed, void (*tick)(void));
+
 /* Decode one frame (compression 0 = raw, 1 = RLE16, PROTOCOL §2 exactness rules) straight from an
  * open asset file, without holding the compressed bytes in RAM (4 KB read buffer). The frame is
  * `len` bytes at file offset `off`, w×h pixels. Of every row only columns [x0, x0+cw) are written,

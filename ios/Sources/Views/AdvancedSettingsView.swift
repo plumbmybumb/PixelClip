@@ -4,7 +4,7 @@ import PixelClipKit
 
 /// Settings ▸ Advanced: everything technical, in one place, so the rest of the app never needs it —
 /// the clip's name and Wi‑Fi behaviour, the hotspot password, Bluetooth wake, firmware, the battery
-/// log, the clip's raw status and (Debug builds) the virtual clip.
+/// log, the clip's raw status, erasing what is on the clip and (Debug builds) the virtual clip.
 struct AdvancedSettingsView: View {
     @Environment(ClipSession.self) private var session
     @Environment(LibraryStore.self) private var library
@@ -20,6 +20,7 @@ struct AdvancedSettingsView: View {
     @State private var batteryLog: String?
     @State private var loadingLog = false
     @State private var resettingIMU = false
+    @State private var confirmErase = false
     @FocusState private var nameFocused: Bool
 
     static let sleepLevels = [5, 8, 10, 15, 20]
@@ -30,6 +31,7 @@ struct AdvancedSettingsView: View {
     var body: some View {
         List {
             clipSection
+            eraseSection
             connectionSection
             Section {
                 Button { resetCalibration() } label: {
@@ -89,6 +91,55 @@ struct AdvancedSettingsView: View {
             Text(reachable ? (session.notice ?? "Stored on the clip.") : "The clip isn’t near: these change once it is.")
         }
         .disabled(!reachable)
+    }
+
+    // MARK: What is on the clip
+
+    /// Erase everything on the clip (asked first: it can't be undone on the clip). It goes like a send with pictures
+    /// (the clip's Wi‑Fi), with its progress here and in the send-status capsule, and ends with a toast naming the free space.
+    private var eraseSection: some View {
+        Section {
+            if sender.isErasing {
+                HStack {
+                    Text(sender.stage.map(SendStatusCapsule.title) ?? "Erasing the clip…")
+                    Spacer()
+                    ProgressView()
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("eraseProgress")
+            } else if sender.eraseFailed, let failure = sender.failure {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(failure.title).font(.subheadline.weight(.semibold))
+                    Text(failure.message).font(.footnote).foregroundStyle(Z2.secondary)
+                }
+                .padding(.vertical, 2)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("eraseFailure")
+                Button("Try again") { sender.retryNow() }
+                    .accessibilityIdentifier("eraseTryAgain")
+                Button("Not now", role: .cancel) { sender.dismissFailure() }
+            } else {
+                Button("Erase everything on the clip…", role: .destructive) { confirmErase = true }
+                    .disabled(!reachable || sender.isSending)
+                    .accessibilityIdentifier("eraseClip")
+            }
+        } header: {
+            Text("What’s on the clip")
+        } footer: {
+            Text(eraseFooter)
+        }
+        .alert("Erase everything on the clip?", isPresented: $confirmErase) {
+            Button("Erase", role: .destructive) { sender.erase() }
+                .accessibilityIdentifier("eraseConfirm")
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Everything shown on the clip goes: its pictures, videos, texts and the playlist on the clip. This can’t be undone.\n\nThe clip keeps its settings, and everything in this app stays on your iPhone, ready to send again.")
+        }
+    }
+
+    private var eraseFooter: String {
+        let room = session.status.map { "\($0.storage.free.byteString) free of \($0.storage.total.byteString). " } ?? ""
+        return room + "Erasing makes room for a new video or playlist."
     }
 
     private var connectionSection: some View {

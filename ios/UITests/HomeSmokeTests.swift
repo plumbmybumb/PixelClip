@@ -122,6 +122,52 @@ final class HomeSmokeTests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground)
     }
 
+    /// Settings ▸ Advanced ▸ Erase everything on the clip: asked first, then the virtual clip is erased ("The clip is
+    /// empty. … free."), Home shows nothing on the clip with nothing to undo, and the playlist switch is off. The switch
+    /// is turned back on at the end (that sends the playlist again).
+    @MainActor
+    func testEraseEverythingOnTheClip() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-PixelClipDemo"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 20), "Home is up")
+        app.buttons["settingsButton"].tap()
+        XCTAssertTrue(app.buttons["advancedRow"].waitForExistence(timeout: 10))
+        app.buttons["advancedRow"].tap()
+        let erase = app.buttons["eraseClip"]
+        XCTAssertTrue(erase.waitForExistence(timeout: 10), "the erase row")
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: erase)
+        waitForExpectations(timeout: 30)
+        erase.tap()
+        let alert = app.alerts["Erase everything on the clip?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "asked first")
+        alert.buttons["Erase"].firstMatch.tap()
+        let done = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "The clip is empty.")).firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 30), "the toast names the free space")
+        back(app)
+        back(app)
+
+        let now = app.staticTexts["nowLine"]
+        XCTAssertTrue(now.waitForExistence(timeout: 10), "back on Home")
+        XCTAssertEqual(now.label, "On the clip now", "nothing on the clip")
+        XCTAssertFalse(app.buttons["homeUndo"].exists, "nothing to undo")
+
+        // The playlist kept its entries and is off; on again, it goes back to the clip.
+        app.buttons["tilePlaylist"].tap()
+        let playlist = app.switches["playlistSwitch"]
+        XCTAssertTrue(playlist.waitForExistence(timeout: 10))
+        XCTAssertEqual(playlist.value as? String, "0", "the playlist is off after an erase")
+        // (Tapped on the switch itself, at the card's right edge; the send-status capsule may still be settling above it.)
+        let on = NSPredicate(format: "value == '1'")
+        for _ in 0..<3 where playlist.value as? String != "1" {
+            playlist.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.5)).tap()
+            _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: on, object: playlist)], timeout: 3)
+        }
+        XCTAssertEqual(playlist.value as? String, "1", "the playlist is on again")
+        back(app)
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
     /// The navigation bar's back button.
     @MainActor private func back(_ app: XCUIApplication) {
         let button = app.navigationBars.buttons.element(boundBy: 0)

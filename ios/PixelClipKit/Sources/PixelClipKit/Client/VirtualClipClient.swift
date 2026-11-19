@@ -49,6 +49,8 @@ import Foundation
 /// - Firmware update gate: `POST /ota/ask` asks for 60 s, a press (`pressButton()`) during it allows uploads for
 ///   120 s, `POST /ota` while not allowed is `403 press_button` (and starts asking). `Options.legacyFirmware`
 ///   answers like firmware that predates both (no `ap_password_set`, 404 on the gate, uploads always accepted).
+/// - Erase (`POST /erase`, Wi‑Fi only): `erase(confirm:)` empties the storage and the playlist, keeps the config, the
+///   clock and the calibration; without `{"confirm":"erase"}` it is `400 confirm_required`.
 public actor VirtualClipClient: ClipClient {
 
     public struct Options: Sendable {
@@ -659,6 +661,30 @@ public actor VirtualClipClient: ClipClient {
     public func clearBatteryLog() async throws {
         try await enter("DELETE /batlog")
         batlog = []
+    }
+
+    public func eraseContent() async throws -> EraseReport { try await erase(confirm: EraseRequest.confirmation) }
+
+    /// `POST /erase` with the body's `confirm` (nil: no body). Anything but `"erase"` is `400 confirm_required` and
+    /// changes nothing; over Bluetooth `413 use_wifi`. Every asset, text and font goes (the reading positions with
+    /// them) and the playlist's `items` and `queue` empty, so the panel shows its idle screen. The config, the clock,
+    /// the motion calibration, the battery log and the session stay.
+    public func erase(confirm: String?) async throws -> EraseReport {
+        try await enter("POST /erase")
+        guard !options.legacyFirmware else { throw err(404, "not_found", "No route /erase.") }
+        guard Self.transport == .wifi else { throw err(413, "use_wifi", "Erase over the clip’s Wi‑Fi.") }
+        guard confirm == EraseRequest.confirmation else {
+            throw err(400, "confirm_required", "Send {\"confirm\":\"erase\"} to erase the clip.")
+        }
+        let removed = EraseReport.Removed(assets: assets.count, texts: storedTexts.count, fonts: storedFonts.count)
+        for id in storedTexts.keys { engine.forgetText(id) }
+        assets = [:]; decoded = [:]
+        storedTexts = [:]; storedFonts = [:]; boundFonts = [:]
+        oracle = nil; oracleReaders = [:]
+        playlistDoc = .empty
+        engine.setPlaylist(playlistDoc, now: deviceNow)
+        let used = usedBytes
+        return EraseReport(removed: removed, storage: .init(total: options.storageTotal, used: used, free: options.storageTotal - used))
     }
 
     // MARK: Reader (§5c)

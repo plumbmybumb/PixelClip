@@ -404,7 +404,7 @@ static esp_err_t start_httpd(void)
 {
     httpd_config_t hc = HTTPD_DEFAULT_CONFIG();
     hc.stack_size = HTTPD_STACK;
-    hc.max_uri_handlers = 48;    /* 41 routes registered (http_api.c), 43 in bench builds */
+    hc.max_uri_handlers = 48;    /* 42 routes registered (http_api.c), 44 in bench builds */
     hc.max_open_sockets = 4;
     hc.lru_purge_enable = true;
     /* Slow clients (security audit WIFI-8, http_api.c "slow-client guard"): every blocking socket call returns

@@ -274,6 +274,16 @@ final class ClipSession {
         UserDefaults.standard.set(date, forKey: Keys.clockSync + id)
     }
 
+    /// The clip was erased: what it was last read to hold goes at once (the session's end reads it again).
+    func clipWasErased(_ report: EraseReport) {
+        clipPlaylist = .empty
+        status?.storage = report.storage
+        status?.playlist = ClipStatus.PlaylistState(count: 0, index: -1, current: nil)
+        status?.queue?.pending = 0
+        status?.queue?.nextAt = nil
+        status?.oracle = nil
+    }
+
     /// Settings ▸ Forget Clip: remove the remembered Wi‑Fi (iOS asks to join again next time) and the
     /// clock record (the next send sets the clock).
     func forgetClip() async {
